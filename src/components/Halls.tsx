@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 
 import { useState, type CSSProperties } from "react";
 import SectionHeading from "./SectionHeading";
@@ -6,6 +7,7 @@ import { box } from "@/lib/px";
 import { HALLS } from "@/lib/halls.mjs";
 import { pickHall, useOrder } from "@/lib/order";
 import StepDone from "./StepDone";
+import HallsMobile from "./HallsMobile";
 
 type FloorPlacement = {
   slug: string;
@@ -498,12 +500,15 @@ export default function Halls() {
                 />
               ))}
             </span>
-            <a href="/halls" className="u-cta halls-action halls-action-all">
+            <Link href="/halls" className="u-cta halls-action halls-action-all">
               ВСЕ ЗАЛЫ
-            </a>
+            </Link>
           </div>
         </div>
       </div>
+
+      {/* Ниже 1024 — один дом за раз: табы, свайп, карточка зала (mobile.css). */}
+      <HallsMobile />
     </section>
   );
 }

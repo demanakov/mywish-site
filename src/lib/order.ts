@@ -1,7 +1,8 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
-import type { PackageId } from "./pricing";
+import { useEffect, useSyncExternalStore } from "react";
+import { HOURS, type PackageId } from "./pricing";
+import { HALL_TITLES } from "./halls.mjs";
 
 /**
  * Черновик заказа, общий для всей страницы: кнопка «выбрать» в карточке пакета
@@ -24,6 +25,14 @@ export type Order = {
   /** Название зала из формы; пустая строка — «помогите выбрать». */
   hall: string;
   sent: boolean;
+  /**
+   * Куда вернуть человека после выбора зала — id блока. Ставится, когда к
+   * залам уходят из другого места страницы (ссылка «выбрать» в итоге
+   * расчёта): выбрал зал — страница сама едет обратно, листать заново не надо.
+   */
+  returnTo: string | null;
+  name: string; phone: string; guests: string; messenger: string; wish: string;
+  calendarMonth: string | null;
 };
 
 const INITIAL: Order = {
@@ -35,6 +44,8 @@ const INITIAL: Order = {
   dateTouched: false,
   hall: "",
   sent: false,
+  returnTo: null,
+  name: "", phone: "", guests: "", messenger: "", wish: "", calendarMonth: null,
 };
 
 let state: Order = INITIAL;
@@ -44,6 +55,7 @@ const emit = () => listeners.forEach((l) => l());
 
 export function setOrder(patch: Partial<Order>) {
   state = { ...state, ...patch };
+  try { sessionStorage.setItem(DRAFT_KEY, JSON.stringify({ expiresAt: Date.now() + DRAFT_TTL, order: { ...state, sent: false } })); } catch { /* Storage is optional. */ }
   emit();
 }
 
@@ -72,66 +84,73 @@ export const pickHours = (hours: number) =>
 export const pickDate = (date: string) =>
   setOrder({ date, dateTouched: true });
 
-/**
- * Выбор зала переживает переход между страницами.
- *
- * Зал выбирают на /halls, а нужен он в форме на главной — это разные адреса,
- * и черновик в памяти между ними теряется, если браузер перезагрузит страницу.
- * Кладём в sessionStorage: выбор живёт в этой вкладке до её закрытия и не
- * всплывает через неделю в новой сессии, как было бы с localStorage.
- */
-const HALL_KEY = "mywish:hall";
-
-export const pickHall = (hall: string) => {
-  setOrder({ hall });
-  try {
-    if (hall) sessionStorage.setItem(HALL_KEY, hall);
-    else sessionStorage.removeItem(HALL_KEY);
-  } catch {
-    /* приватный режим и запрет хранилища — выбор просто не переживёт переход */
-  }
-};
-
-/**
- * Поднять сохранённый зал. Вызывается после гидрации, а не при первом
- * отрисовывании: на сервере sessionStorage нет, и разметка разошлась бы.
- *
- * Перезагрузка выбор сбрасывает. Хранилище нужно ровно для одного — донести
- * зал со страницы залов в форму на главной; переживать обновление страницы
- * оно не должно, иначе выбор нечем снять: человек жмёт F5, а зал по-прежнему
- * отмечен, и это выглядит как заевшая кнопка. Тип перехода отличает
- * обновление от обычного перехода по ссылке.
- */
+/** Черновик вкладки хранится 24 часа. Согласие и успех не сохраняются. */
+const DRAFT_KEY = "mywish:draft:v1";
+const DRAFT_TTL = 24 * 60 * 60 * 1000;
+let restored = false;
+export const pickHall = (hall: string) => setOrder({ hall });
 export function restoreHall() {
-  if (state.hall) return;
+  if (restored || typeof window === "undefined") return;
+  restored = true;
   try {
-    const [nav] = performance.getEntriesByType(
-      "navigation",
-    ) as PerformanceNavigationTiming[];
-    if (nav?.type === "reload") {
-      sessionStorage.removeItem(HALL_KEY);
-      return;
-    }
-    const hall = sessionStorage.getItem(HALL_KEY);
-    if (hall) setOrder({ hall });
-  } catch {
-    /* см. выше */
-  }
+    const raw = sessionStorage.getItem(DRAFT_KEY);
+    const saved = raw ? JSON.parse(raw) : null;
+    if (saved?.expiresAt > Date.now() && saved.order && typeof saved.order === "object") {
+      const o = saved.order;
+      const text = (key: string, limit: number) => typeof o[key] === "string" ? o[key].slice(0, limit) : "";
+      const date = typeof o.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(o.date) ? o.date : null;
+      state = { ...INITIAL,
+        pkg: ["happy", "extra", "wow"].includes(o.pkg) ? o.pkg : INITIAL.pkg,
+        pkgTouched: o.pkgTouched === true,
+        hours: HOURS.includes(o.hours) ? o.hours : INITIAL.hours,
+        hoursTouched: o.hoursTouched === true,
+        date, dateTouched: Boolean(date && o.dateTouched),
+        hall: HALL_TITLES.includes(o.hall) ? o.hall : "",
+        name: text("name", 100), phone: text("phone", 40), guests: text("guests", 30),
+        messenger: text("messenger", 200), wish: text("wish", 2000),
+        calendarMonth: typeof o.calendarMonth === "string" && /^\d{4}-\d{2}$/.test(o.calendarMonth) ? o.calendarMonth : null,
+        returnTo: ["price", "contact"].includes(o.returnTo) ? o.returnTo : null,
+      };
+      emit();
+    } else sessionStorage.removeItem(DRAFT_KEY);
+    sessionStorage.removeItem("mywish:hall");
+  } catch { /* Storage is optional. */ }
+}
+export function resetDraft() {
+  state = { ...INITIAL };
+  try { sessionStorage.removeItem(DRAFT_KEY); } catch { /* optional */ }
+  emit();
 }
 
 export const markSent = () => setOrder({ sent: true });
 
-/** Дата по умолчанию ставится после гидрации: на сервере «сегодня» неизвестно. */
-export function initDate(date: string) {
-  if (state.date === null) setOrder({ date });
+/** Запомнить, к какому блоку вернуть человека после выбора зала. */
+export const setReturnTo = (id: string | null) => setOrder({ returnTo: id });
+
+/** Плавно вернуть к блоку по id и забыть точку возврата. */
+export function goBackTo(id: string) {
+  setOrder({ returnTo: null });
+  document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+/**
+ * Зал выбран — если человек пришёл за ним из другого блока, вернуть его туда.
+ * Пауза нужна, чтобы успела отыграть отметка выбора: галочка на этаже и на
+ * шаге; иначе страница уезжает в тот же кадр, и выбор выглядит незавершённым.
+ */
+export function returnAfterHallPick(delay = 700) {
+  const id = state.returnTo;
+  if (!id) return;
+  setOrder({ returnTo: null });
+  window.setTimeout(() => {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, delay);
 }
 
 export function useOrder(): Order {
+  useEffect(restoreHall, []);
   return useSyncExternalStore(
-    (l) => {
-      listeners.add(l);
-      return () => listeners.delete(l);
-    },
+    (l) => { listeners.add(l); return () => listeners.delete(l); },
     () => state,
     () => INITIAL,
   );

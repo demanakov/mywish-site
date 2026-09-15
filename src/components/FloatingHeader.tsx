@@ -4,12 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import { box } from "@/lib/px";
 import { CONTACTS } from "@/lib/contacts";
 import HeaderHome from "./HeaderHome";
+import MobileFloatingHeader from "./MobileFloatingHeader";
 
 /* С абсолютным путём пункты работают и со страницы залов, и на главной. */
 const NAV = [
   { href: "/#halls", label: "Залы" },
   { href: "/#packages", label: "Пакеты" },
   { href: "/#price", label: "Цены" },
+  { href: "/#contact", label: "Заявка" },
 ];
 
 const CTA_HEADER: React.CSSProperties = {
@@ -224,14 +226,12 @@ export default function FloatingHeader() {
         С курсором шапку зовёт только наведение. Прокрутка при этом всё равно
         может её убрать: уехали вниз — значит меню больше не нужно.
       */
-      if (!курсорЕсть) {
+      {
         if (direction < 0 && distanceInDirection >= UP_TO_SHOW && !quietUntil()) {
           commitVisibility(true);
         } else if (direction > 0 && distanceInDirection >= DOWN_TO_HIDE) {
           commitVisibility(false);
         }
-      } else if (direction > 0 && distanceInDirection >= DOWN_TO_HIDE) {
-        commitVisibility(false);
       }
 
       lastY = currentY;
@@ -312,6 +312,9 @@ export default function FloatingHeader() {
   }, []);
 
   return (
+    <>
+    {/* Ниже 1024 — своя плавающая шапка: выезжает при прокрутке вверх. */}
+    <MobileFloatingHeader />
     <header
       ref={headerRef}
       className="floating-site-header"
@@ -331,7 +334,7 @@ export default function FloatingHeader() {
           <HeaderHome floating />
         </span>
 
-        <span className="absolute" style={box(567, 35, 307, 39)}>
+        <span className="absolute" style={box(477, 35, 397, 39)}>
           {/*
             Заливка и обводка — в CSS, а не инлайном: у варианта «над первым
             экраном» они другие (прозрачнее, как в шапке hero), а инлайн-стиль
@@ -339,7 +342,7 @@ export default function FloatingHeader() {
           */}
           <nav
             aria-label="Навигация по странице"
-            className="floating-header-nav relative grid size-full grid-cols-3 rounded-pill"
+            className="floating-header-nav relative grid size-full grid-cols-4 rounded-pill"
           >
             <span
               aria-hidden
@@ -365,7 +368,7 @@ export default function FloatingHeader() {
           <a
             href={CONTACTS.telegram}
             aria-label="Telegram MyWish"
-            className="floating-header-chip group flex size-full items-center justify-center rounded-pill border-[0.0675rem] border-[rgba(255,255,255,0.62)] transition-all duration-200 hover:-translate-y-2 hover:border-primary hover:shadow-[0_0.375rem_0.875rem_rgba(28,17,23,0.22)]"
+            className="floating-header-chip group flex size-full items-center justify-center rounded-pill border-[0.0675rem] border-[rgba(255,255,255,0.62)] transition-[transform,background-color,color,border-color,box-shadow] duration-200 hover:-translate-y-2 hover:border-primary hover:shadow-[0_0.375rem_0.875rem_rgba(28,17,23,0.22)]"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -381,7 +384,7 @@ export default function FloatingHeader() {
           <a
             href={CONTACTS.max}
             aria-label="MAX MyWish"
-            className="floating-header-chip group flex size-full items-center justify-center rounded-pill border-[0.0675rem] border-[rgba(255,255,255,0.62)] transition-all duration-200 hover:-translate-y-2 hover:border-primary hover:shadow-[0_0.375rem_0.875rem_rgba(28,17,23,0.22)]"
+            className="floating-header-chip group flex size-full items-center justify-center rounded-pill border-[0.0675rem] border-[rgba(255,255,255,0.62)] transition-[transform,background-color,color,border-color,box-shadow] duration-200 hover:-translate-y-2 hover:border-primary hover:shadow-[0_0.375rem_0.875rem_rgba(28,17,23,0.22)]"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -411,5 +414,6 @@ export default function FloatingHeader() {
         </span>
       </div>
     </header>
+    </>
   );
 }

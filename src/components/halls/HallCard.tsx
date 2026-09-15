@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { pickHall, useOrder } from "@/lib/order";
+import { useSwipe } from "@/lib/useSwipe";
 
 /**
  * Карточка зала: обложка, которую можно листать прямо на месте, название и
@@ -47,9 +48,16 @@ export default function HallCard({
   const step = (delta: number) =>
     setIndex((i) => (i + delta + shots) % shots);
 
+  /*
+    На телефоне кадры листаются свайпом по фотографии: наведения там нет, и
+    стрелки — единственная подсказка, а попасть по ним пальцем труднее, чем
+    провести по снимку. Нажатие без сдвига по-прежнему открывает просмотр.
+  */
+  const swipe = useSwipe(step);
+
   return (
     <article id={slug} className="halls-card">
-      <div className="halls-card-frame">
+      <div className="halls-card-frame" {...swipe}>
         <button
           type="button"
           className="halls-card-open"
@@ -135,9 +143,9 @@ export default function HallCard({
           className="halls-card-book"
           data-picked={picked}
           data-dim={dim}
-          onClick={() => pickHall(title)}
+          onClick={(event) => { if (picked) { event.preventDefault(); pickHall(""); } else pickHall(title); }}
         >
-          {picked ? "Выбран" : "Выбрать"}
+          {picked ? "Отменить выбор" : "Выбрать"}
         </Link>
       </div>
     </article>

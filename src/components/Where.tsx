@@ -1,5 +1,8 @@
+import Link from "next/link";
+import { LOCATIONS, HALLS } from "@/lib/halls.mjs";
 import SectionHeading from "./SectionHeading";
 import YandexMap from "./YandexMap";
+import WhereMobile from "./WhereMobile";
 import { box, px } from "@/lib/px";
 
 /**
@@ -25,41 +28,34 @@ type Address = {
   slug: string;
 };
 
-const ADDRESSES: Address[] = [
+const ADDRESS_LAYOUT: Omit<Address, "title" | "metro" | "map" | "halls">[] = [
   {
     node: "914:1987",
     n: "1",
-    title: "Кожевенная линия, 34А",
-    metro: "м. Горный институт · ≈ 8 минут на такси",
-    halls: "Фламинго · Вайт · Блэк",
     y: 182,
     rating: { file: "rating-1", at: [61, 52, 228, 15] },
-    map: "https://yandex.ru/maps/org/rubin_loft/94381773448/",
     slug: "kozhevennaya-34",
   },
   {
     node: "914:1997",
     n: "2",
-    title: "Профессора Качалова, 8И",
-    metro: "м. Площадь Александра Невского · ≈ 7 минут на такси",
-    halls: "Барби · Сицилия · Оушен Драйв",
     y: 329,
     rating: { file: "rating-2", at: [61, 49, 228, 22] },
-    map: "https://yandex.ru/maps/org/rubin_loft/224972655169/",
     slug: "kachalova-8",
   },
   {
     node: "914:2007",
     n: "3",
-    title: "Профессора Качалова, 15А",
-    metro: "м. Площадь Александра Невского · ≈ 9 минут на такси",
-    halls: "Леонардо · Санта-Лючия · Рубин Холл",
     y: 477,
     rating: { file: "rating-3", at: [60, 52, 228, 16] },
-    map: "https://yandex.ru/maps/org/rubin_loft/100393680164/",
     slug: "kachalova-15",
   },
 ];
+const ADDRESSES: Address[] = ADDRESS_LAYOUT.map(layout => {
+  const location = LOCATIONS.find(item => item.slug === layout.slug)!;
+  return { ...layout, title: location.title, metro: location.metro, map: location.map, halls: HALLS.filter(hall => hall.location === layout.slug).map(hall => hall.title).join(" · ") };
+});
+
 
 export default function Where() {
   return (
@@ -139,13 +135,13 @@ export default function Where() {
               Ведёт не просто на страницу залов, а сразу на эту площадку:
               якорь совпадает со slug площадки в src/lib/halls.mjs.
             */}
-            <a
+            <Link
               href={`/halls#${a.slug}`}
               className="u-halls-link flex items-center justify-center rounded-pill font-sans font-bold"
               style={{ ...box(354, 40, 84, 34), fontSize: px(11) }}
             >
               Залы
-            </a>
+            </Link>
 
             <a
               href={a.map}
@@ -180,6 +176,9 @@ export default function Where() {
           </li>
         ))}
       </ul>
+
+      {/* Ниже 1024 — статичная карта с метками и карточка площадки (mobile.css). */}
+      <WhereMobile />
     </section>
   );
 }

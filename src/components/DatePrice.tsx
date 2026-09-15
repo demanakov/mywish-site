@@ -1,10 +1,12 @@
 "use client";
+import { parseKey, useCalendar } from "@/lib/calendar";
 
 import { useEffect, useState } from "react";
 import SectionHeading from "./SectionHeading";
 import StepDone from "./StepDone";
+import DatePriceMobile from "./DatePriceMobile";
 import { box, px } from "@/lib/px";
-import { initDate, pickDate, pickHours, pickPackage, useOrder } from "@/lib/order";
+import { pickDate, pickHours, pickPackage, useOrder } from "@/lib/order";
 import { HALLS } from "@/lib/halls.mjs";
 import {
   HOURS,
@@ -74,11 +76,7 @@ function OurPick({ shown }: { shown: boolean }) {
   );
 }
 
-const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
-const parseKey = (key: string) => {
-  const [y, m, d] = key.split("-").map(Number);
-  return new Date(y, m - 1, d);
-};
+
 
 /**
  * Вид ячейки календаря — как в макете: прошедшие дни без подложки, будни
@@ -137,14 +135,8 @@ export default function DatePrice() {
   const order = useOrder();
   /* Дата под курсором: по ней живёт подсказка под заголовком. */
   const [hoverKey, setHoverKey] = useState<string | null>(null);
-  const [today, setToday] = useState<Date | null>(null);
-  const [monthOffset, setMonthOffset] = useState(0);
+  const { today, monthOffset, setMonthOffset } = useCalendar();
 
-  useEffect(() => {
-    const t = startOfDay(new Date());
-    setToday(t);
-    initDate(dateKey(t));
-  }, []);
 
   const anchor = today ?? new Date();
   const shown = new Date(anchor.getFullYear(), anchor.getMonth() + monthOffset, 1);
@@ -690,6 +682,9 @@ export default function DatePrice() {
         Перед бронированием менеджер проверит свободное время и подтвердит
         итоговую сумму.
       </p>
+
+      {/* Ниже 1024 — своя раскладка: календарь, пакет и часы, итог (mobile.css). */}
+      <DatePriceMobile />
     </section>
   );
 }

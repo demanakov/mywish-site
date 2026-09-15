@@ -8,11 +8,11 @@ import localFont from "next/font/local";
 /** Заголовки: Fira Sans Extra Condensed. */
 export const fira = localFont({
   src: [
-    { path: "../../Fira_Sans_Extra_Condensed/FiraSansExtraCondensed-Regular.ttf", weight: "400", style: "normal" },
-    { path: "../../Fira_Sans_Extra_Condensed/FiraSansExtraCondensed-SemiBold.ttf", weight: "600", style: "normal" },
-    { path: "../../Fira_Sans_Extra_Condensed/FiraSansExtraCondensed-Bold.ttf", weight: "700", style: "normal" },
-    { path: "../../Fira_Sans_Extra_Condensed/FiraSansExtraCondensed-ExtraBold.ttf", weight: "800", style: "normal" },
-    { path: "../../Fira_Sans_Extra_Condensed/FiraSansExtraCondensed-Black.ttf", weight: "900", style: "normal" },
+    { path: "../fonts/FiraSansExtraCondensed-Regular.woff2", weight: "400", style: "normal" },
+    { path: "../fonts/FiraSansExtraCondensed-SemiBold.woff2", weight: "600", style: "normal" },
+    { path: "../fonts/FiraSansExtraCondensed-Bold.woff2", weight: "700", style: "normal" },
+    { path: "../fonts/FiraSansExtraCondensed-ExtraBold.woff2", weight: "800", style: "normal" },
+    { path: "../fonts/FiraSansExtraCondensed-Black.woff2", weight: "900", style: "normal" },
   ],
   variable: "--font-fira",
   display: "swap",
@@ -21,7 +21,7 @@ export const fira = localFont({
 
 /** Текст: Manrope (вариативный, 200–800 покрывает Regular/Medium/SemiBold/Bold/ExtraBold). */
 export const manrope = localFont({
-  src: [{ path: "../../Manrope/Manrope-VariableFont_wght.ttf", weight: "200 800", style: "normal" }],
+  src: [{ path: "../fonts/Manrope-VariableFont_wght.woff2", weight: "200 800", style: "normal" }],
   variable: "--font-manrope",
   display: "swap",
   fallback: ["Segoe UI", "system-ui", "Helvetica Neue", "Arial", "sans-serif"],

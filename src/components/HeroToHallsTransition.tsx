@@ -52,9 +52,18 @@ export default function HeroToHallsTransition() {
       return;
 
     const media = window.matchMedia(ACTIVE_QUERY);
+    /*
+      В разметке preload="none": переход живёт только на десктопе, и телефон
+      не должен качать ролик заранее. Где переход есть — буферизуем его сразу,
+      чтобы полёт по нажатию начинался без ожидания.
+    */
+
     const trigger = document.querySelector<HTMLElement>(
       "[data-hero-halls-trigger]",
     );
+    const warm = () => { if (media.matches && video.preload === "none") { video.preload = "auto"; video.load(); } };
+    trigger?.addEventListener("pointerenter", warm);
+    trigger?.addEventListener("focus", warm);
     let animationFrame = 0;
     let handoffAnimation: Animation | null = null;
     let playing = false;
@@ -247,6 +256,8 @@ export default function HeroToHallsTransition() {
 
     return () => {
       cancel();
+      trigger?.removeEventListener("pointerenter", warm);
+      trigger?.removeEventListener("focus", warm);
       video.removeEventListener("ended", beginHandoff);
       trigger?.removeEventListener("click", playToHalls);
       window.removeEventListener("wheel", cancel);
@@ -267,8 +278,8 @@ export default function HeroToHallsTransition() {
         className="hero-halls-transition-video"
         muted
         playsInline
-        preload="auto"
-        poster="/transition/hero-to-halls/frame-001.webp"
+        preload="none"
+
       >
         <source src="/video/hero-to-halls.mp4" type="video/mp4" />
         <source src="/video/hero-to-halls.webm" type="video/webm" />

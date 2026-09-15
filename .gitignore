@@ -28,3 +28,9 @@ next-env.d.ts
 
 # настройки локального окружения
 /.claude/
+
+# Local design inputs (web derivatives live in public/)
+/*.png
+/docs/menu-extracted.json
+/test-results/
+/playwright-report/

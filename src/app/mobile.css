@@ -1,0 +1,3711 @@
+/* ─────────────────────────────────────────────────────────────
+   Мобильная версия — автоматическая раскладка (ниже 1024px)
+
+   Макета для телефона нет, а главная собрана абсолютными координатами
+   сцены 1440 (box() из src/lib/px.ts). Масштабировать её до 375 нельзя —
+   кегль уходит в 4px. Поэтому ниже 1024 сцена «разворачивается в поток»:
+
+     1. каждый элемент с координатами box() теряет left/top/width/height
+        и встаёт в колонку в порядке разметки;
+     2. родитель таких элементов становится flex-колонкой;
+     3. картинки держат свою макетную ширину, но не шире экрана;
+     4. декоративные подложки и стикеры прячутся.
+
+   Узнаём box() по инлайн-стилю: React пишет его как «position:absolute;
+   left:…;top:…», а после перерисовки браузер переписывает атрибут с пробелами
+   — поэтому оба варианта. Элементы с классом .absolute (Tailwind) не трогаем:
+   это слои поверх карточки — кнопка play, кадры состояний, — им координаты
+   внутри родителя нужны и в потоке.
+
+   Десктоп этот файл не задевает: всё лежит под одним @media.
+
+   Как дорабатывать: общие правила — раздел «Автоматика», ручные правки
+   по секциям — ниже, по одной на секцию, селектором от #id секции.
+   Проверка: node scripts/mobile.mjs (снимки и поиск вылезающих элементов).
+   ───────────────────────────────────────────────────────────── */
+
+@media (max-width: 1023.98px) {
+  /* ── Масштаб и каркас ───────────────────────────────────────── */
+
+  /* 1 px макета = 1 css px: основной текст остаётся 15px, как на 1440. */
+  :root {
+    font-size: 16px;
+
+    /* Заголовки макета (78/60/45) на телефоне не помещаются в строку. */
+    --text-d-xl: clamp(2.125rem, 9vw, 3.25rem);
+    --text-d-xl--line-height: 0.95;
+    --text-d-l: clamp(2rem, 8.5vw, 3rem);
+    --text-d-l--line-height: 0.95;
+    --text-d-m: clamp(1.75rem, 7.5vw, 2.5rem);
+    --text-d-m--line-height: 1;
+
+    --text-hero: clamp(2.25rem, 10.5vw, 3.75rem);
+    --text-hero--line-height: 0.92;
+    --text-hero-lede: 1.0625rem;
+    --text-hero-lede--line-height: 1.5rem;
+
+    --m-gutter: 1rem;
+  }
+
+  /* Притягивание к секциям в одну колонку мешает листать длинные блоки. */
+  html {
+    scroll-snap-type: none;
+  }
+
+  body {
+    overflow-x: clip;
+  }
+
+  .stage-after-hero-transition {
+    width: auto;
+    max-width: 40rem;
+    height: auto !important;
+    /* Снизу — поле под подвалом, чтобы он не упирался в край экрана. */
+    padding: 2.5rem var(--m-gutter) max(1rem, env(safe-area-inset-bottom));
+  }
+
+  /* ── Автоматика: координаты → поток ─────────────────────────── */
+
+  .stage-after-hero-transition
+    :is([style*="position:absolute"], [style*="position: absolute"])[style*="top:"]:not(.absolute) {
+    position: relative !important;
+    inset: auto !important;
+    height: auto !important;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .stage-after-hero-transition
+    :is([style*="position:absolute"], [style*="position: absolute"])[style*="top:"]:not(.absolute, img, video) {
+    width: auto !important;
+  }
+
+  /* Картинки: макетная ширина, но не шире колонки; высота — по пропорциям. */
+  .stage-after-hero-transition
+    :is(img, video)[style*="top:"]:not(.absolute) {
+    max-width: 100% !important;
+    height: auto !important;
+    align-self: center;
+  }
+
+  /* Родитель координатных элементов — колонка. */
+  .stage-after-hero-transition
+    :has(> :is([style*="position:absolute"], [style*="position: absolute"])[style*="top:"]:not(.absolute)) {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  /*
+    Ритм между блоками — одна величина: 4rem между коробками дают ≈60px
+    между тем, что видно (у заголовка сверху есть поле строки). Исключения
+    считаны по видимому краю, а не по коробке:
+      · Reels → «Личный менеджер»: волна тёмной полосы выступает над
+        коробкой на 2.75rem, её видимый верх — в среднем на 1rem ниже;
+      · «Пакеты», «Дата», «Заявка» — одна цветная зона: между ними не
+        margin, а нижнее поле 3.5rem (≈ тот же ритм);
+      · «Вопросы» → полоса заявки → подвал — по 1rem: это одна концовка
+        страницы.
+  */
+  .stage-after-hero-transition [data-section],
+  .stage-after-hero-transition .u-cta-band {
+    margin-bottom: 4rem;
+    gap: 1rem;
+  }
+  /* Волна «Личного менеджера» (3.25rem, выступает на 2.75rem): её видимый верх — от 14 до 35px ниже края; 5rem дают ≈60px в среднем. */
+  .stage-after-hero-transition #reels {
+    margin-bottom: 5rem;
+  }
+
+  /* Карточки (не секции и не слои) — с внутренним полем: иначе текст у кромки. */
+  .stage-after-hero-transition
+    :has(> :is([style*="position:absolute"], [style*="position: absolute"])[style*="top:"]:not(.absolute)):not([data-section], .halls-interface-layer, .halls-houses-layer) {
+    padding: 1rem;
+  }
+
+  /* Строки, которые на десктопе держались в одну линию. */
+  .stage-after-hero-transition .whitespace-nowrap,
+  .stage-after-hero-transition .u-lede,
+  .u-heading,
+  .u-step-hint,
+  .halls-instruction {
+    white-space: normal;
+    overflow-x: clip;
+    overflow-y: visible;
+    text-overflow: clip;
+  }
+
+  .u-heading {
+    text-wrap: balance;
+  }
+
+  /* ── Декор ──────────────────────────────────────────────────── */
+
+  /* Подложки и водяные знаки привязаны к координатам сцены 1440. */
+  .decor-layer,
+  /* Повёрнутые наклейки у заголовков и на карточках (стикеры шагов — ниже). */
+  .stage-after-hero-transition img[aria-hidden][style*="rotate"] {
+    display: none !important;
+  }
+
+  /* ── Выбери зал ─────────────────────────────────────────────── */
+
+  /* Два слоя секции абсолютны классом, а не box(): ставим их друг под другом. */
+  #halls .halls-interface-layer,
+  #halls .halls-houses-layer {
+    position: relative;
+    inset: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  /*
+    Три десктопных дома и подсказка про наведение уступают место ленте
+    HallsMobile.tsx. Скрытые картинки с loading="lazy" браузер не качает.
+  */
+  #halls .halls-houses-layer,
+  #halls .halls-instruction {
+    display: none;
+  }
+
+  /* ── Шаги: стикер с цифрой на первой букве заголовка ────────────
+
+    Зал, пакет, дата, заявка. На телефоне стикер не привязан к первой букве,
+    как на десктопе: заголовок там центрирован и переносится как придётся, и
+    стикер у буквы выглядел случайно прилепленным. Здесь он крупный и стоит
+    по центру над заголовком — читается как номер шага. Галочка и искры
+    стоят в той же точке и сменяют стикер анимацией из globals.css. Поворот
+    из макета остаётся инлайном.
+
+    Селектор длинный намеренно: общее правило «координаты → поток» выше
+    весит (0,4,0) и с !important, иначе его не перебить.
+  */
+  /*
+    Система шагов на телефоне: номер → подпись «Шаг N из 4» → заголовок.
+    Одинаковый размер, без наклона, одинаковые зазоры у всех четырёх.
+
+    Стикер больше не абсолютный: он стоит в потоке колонки первым
+    (order), поэтому сам держит место над заголовком. Раньше его ставили
+    через top от края секции, и у секций с разными верхними полями
+    (пакеты) он то висел высоко, то наезжал на заголовок. Галочка и искры
+    стоят в той же точке — подтянуты вверх на высоту стикера и зазор
+    колонки (--col-gap = gap секции).
+  */
+  .stage-after-hero-transition [data-step] {
+    --sticker-size: 3.25rem;
+  }
+  /*
+    Зазор колонки, в которой стоит стикер, задан явно: у секций пакетов,
+    даты и заявки он 0.5rem, у слоя интерфейса залов — 1rem. Сдвиги галочки,
+    подписи и заголовка считаются от него.
+  */
+  .stage-after-hero-transition :has(> .u-step-sticker) {
+    --col-gap: 0.5rem;
+    row-gap: var(--col-gap) !important;
+  }
+  .stage-after-hero-transition .halls-interface-layer:has(> .u-step-sticker) {
+    --col-gap: 1rem;
+  }
+  .stage-after-hero-transition
+    [data-step]
+    :is(.u-step-sticker, .u-step-check, .u-step-burst)[style] {
+    position: relative !important;
+    inset: auto !important;
+    z-index: 2;
+    order: -2;
+    display: block !important;
+    flex: none;
+    align-self: center !important;
+    width: var(--sticker-size) !important;
+    height: var(--sticker-size) !important;
+    max-width: none !important;
+    margin: 0 !important;
+    object-fit: contain;
+    transform: none !important;
+    filter: drop-shadow(0 0.25rem 0.375rem rgb(219 64 79 / 0.22));
+  }
+  .stage-after-hero-transition
+    [data-step]
+    :is(.u-step-check, .u-step-burst)[style] {
+    margin-top: calc(-1 * (var(--sticker-size) + var(--col-gap))) !important;
+  }
+  .stage-after-hero-transition [data-step] .u-step-burst[style] {
+    filter: none;
+  }
+  .u-step-caption {
+    display: none;
+  }
+  .stage-after-hero-transition [data-step] .u-step-caption {
+    order: -2;
+    display: block;
+    align-self: center;
+    margin-top: calc(0.375rem - var(--col-gap));
+    color: var(--color-primary);
+    font-family: var(--font-sans);
+    font-size: 0.6875rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    line-height: 1;
+    text-transform: uppercase;
+    transition: color 260ms var(--ease-out);
+  }
+  .stage-after-hero-transition [data-step][data-done="true"] .u-step-caption {
+    color: var(--color-navy);
+  }
+  /* От подписи до заголовка — ровно 0.875rem. */
+  .stage-after-hero-transition [data-step] .u-heading {
+    margin-top: calc(0.875rem - var(--col-gap)) !important;
+  }
+
+  /* ── Как выглядит праздник: сменяющаяся сетка 2/1/2 (GalleryMobile) ──
+
+    Одиннадцать плиток по координатам макета здесь не показываем: столбцом
+    они занимали два экрана. Их место занимает сетка из пяти мест.
+  */
+  #gallery > figure {
+    display: none;
+  }
+
+  /* ── Reels: лента со свайпом ────────────────────────────────── */
+
+  /* Дорожка .reels-track на десктопе display: contents, здесь — лента. */
+  #reels .reels-track {
+    display: flex;
+    flex-direction: row;
+    gap: 0.75rem;
+    max-width: none;
+    margin-inline: calc(-1 * var(--m-gutter));
+    padding: 0 var(--m-gutter) 0.25rem;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding-inline: var(--m-gutter);
+    scrollbar-width: none;
+  }
+  /*
+    Карточка почти во весь экран: по ширине оставляет справа 3.5rem под
+    соседнюю, по высоте — только поля сверху и снизу (7rem). Раньше здесь
+    был запас под заголовок и подпись (13rem), и на iPhone с панелями
+    Safari ролик сжимался до 265px в ширину. Заголовок блока теперь уходит
+    за верх экрана, зато ролик крупный; во весь экран — кнопкой в углу.
+    0.5621 — пропорция ролика 380×676.
+
+    snap-stop: always — один свайп листает ровно одну карточку: сильный
+    взмах иначе проскакивал через соседа.
+  */
+  #reels .reels-track > .u-reel {
+    flex: none;
+    width: min(
+      calc(100vw - 4.5rem),
+      calc((100svh - 7rem) * 0.5621),
+      26rem
+    ) !important;
+    aspect-ratio: 380 / 676;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+    border-radius: var(--radius-lg);
+  }
+  /* Кнопка play стоит на макетной координате карточки 380 — центруем. */
+  #reels .u-reel-play {
+    left: 50% !important;
+    top: 50% !important;
+    translate: -50% -50%;
+    width: 3.5rem !important;
+    height: 3.5rem !important;
+  }
+
+  /*
+    Соседние карточки меньше и тише текущей: видно, какой ролик сейчас
+    главный. Уменьшение от левого края — выглядывающий справа край соседа
+    остаётся на месте, а сама карточка ниже текущей. Признак data-current
+    ставит Reels.tsx только в режиме касания.
+
+    На время перестановки круга (data-jumping) анимации выключены: копия
+    и оригинал в этот момент меняются ролями, и переход «дышал» бы на месте.
+  */
+  #reels .u-reel {
+    transform-origin: left center;
+    transition:
+      opacity 320ms var(--ease-out),
+      scale 320ms var(--ease-out);
+  }
+  #reels .u-reel[data-current="false"] {
+    opacity: 0.6;
+    scale: 0.88;
+  }
+  #reels .reels-track[data-jumping] .u-reel {
+    transition: none !important;
+  }
+  /* Во весь экран открывают текущий ролик — у приглушённых соседей кнопки нет. */
+  #reels .u-reel[data-current="false"] .u-reel-full {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* ── Один человек: секция стоит на тёмной подложке, её на телефоне нет ── */
+
+  #manager {
+    position: relative;
+    z-index: 2;
+    isolation: isolate;
+    max-width: none;
+    margin-inline: calc(-1 * var(--m-gutter));
+    margin-bottom: 0;
+    padding: 2.75rem var(--m-gutter) 0;
+    background: var(--color-navy);
+    overflow-x: clip;
+    overflow-y: visible;
+  }
+
+  /*
+    The desktop art uses overlapping vector bands instead of hard section
+    edges. These two small SVG waves reproduce that transition on phones:
+    navy rises into the section at the top and the package blush rises into
+    it at the bottom. Content, especially the hand, stays above both waves.
+  */
+  #manager::before,
+  #manager::after {
+    content: "";
+    position: absolute;
+    left: -8%;
+    z-index: 0;
+    width: 116%;
+    pointer-events: none;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 100% 100%;
+  }
+  #manager::before {
+    top: -2.75rem;
+    height: 3.25rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 390 64' preserveAspectRatio='none'%3E%3Cpath fill='%230E1736' d='M0 43C91 7 218 58 390 17V64H0Z'/%3E%3C/svg%3E");
+  }
+  #manager::after {
+    right: auto;
+    bottom: -1px;
+    height: 4.5rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 390 92' preserveAspectRatio='none'%3E%3Cpath fill='%23FFF1F2' d='M0 22C72 64 143 71 202 43C264 13 350 25 390 75V92H0Z'/%3E%3C/svg%3E");
+  }
+  #manager > * {
+    z-index: 1;
+  }
+
+  #manager .manager-desktop-card,
+  #manager img[data-node-id="914:1211"] {
+    display: none !important;
+  }
+
+  #manager .manager-mobile-visual {
+    display: block;
+    width: calc(100% + 2 * var(--m-gutter));
+    margin: -2rem calc(-1 * var(--m-gutter)) 0;
+    overflow: visible;
+  }
+
+  #manager .manager-mobile-phone {
+    position: relative;
+    z-index: 2;
+    display: block;
+    width: 128%;
+    max-width: none !important;
+    height: auto !important;
+    margin-left: -11%;
+    margin-bottom: 0;
+  }
+
+  /*
+    ── Где проходит: живая карта и три карточки уступают место WhereMobile ──
+    (статичная карта с метками и одна карточка за раз).
+  */
+  #where > [data-node-id="914:1905"],
+  #where > ul {
+    display: none !important;
+  }
+
+  /* ── Выбери дату ────────────────────────────────────────────── */
+
+  #price .text-right {
+    text-align: left;
+  }
+
+  /* ── Вопросы: номер, вопрос и плюс в одну строку ────────────── */
+
+  #faq summary {
+    height: auto !important;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+  }
+  #faq summary > span:nth-child(2) {
+    flex: 1;
+    font-size: 1.0625rem !important;
+    line-height: 1.35 !important;
+  }
+  #faq .u-faq-mark {
+    flex: none;
+    width: 1.75rem !important;
+    height: 1.75rem !important;
+  }
+  #faq .u-faq-body {
+    margin: 0 0.75rem 0.75rem !important;
+    padding: 0.875rem 1rem !important;
+  }
+
+  /*
+    Шапка вопросов — одна композиция: заголовок справа, крупный Руби под
+    ним слева, пламя свечи заходит между «В» и «о» первой строки, подпись
+    справа у ковра. Положение Руби и отступы считает Faq.tsx по буквам
+    заголовка (--rubi-x/y, --faq-lede-gap, --faq-list-gap). Текст — поверх
+    картинки.
+  */
+  #faq {
+    position: relative;
+    /* Вопросы, полоса заявки и подвал — одна концовка: зазоры между ними равны (1rem). */
+    margin-bottom: 1rem !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "heading"
+      "lede"
+      "list";
+    row-gap: 0;
+  }
+  #faq > h2 {
+    grid-area: heading;
+    z-index: 2;
+    justify-self: end;
+    /*
+      Кегль подбирает Faq.tsx: заголовок — от пламени до низа кресла.
+      Без фирменной разрядки 4% и со свободнее интерлиньяжем: строка
+      «Вопросы, которые» становится уже, кегль крупнее, а три строки
+      дотягиваются до низа кресла — как в макете шапки.
+    */
+    font-size: var(--faq-fs, clamp(2.125rem, 10vw, 3rem)) !important;
+    letter-spacing: 0 !important;
+    line-height: 1.05 !important;
+    text-align: right !important;
+    white-space: nowrap !important;
+  }
+  /* Подпись — одной строкой, мелко, низом по низу ковра (считает Faq.tsx). */
+  #faq > p {
+    grid-area: lede;
+    z-index: 2;
+    justify-self: end;
+    margin-top: var(--faq-lede-gap, 0.5rem) !important;
+    font-size: var(--faq-lede-fs, 0.6875rem) !important;
+    line-height: 1.3 !important;
+    text-align: right;
+    white-space: nowrap;
+  }
+  #faq > img {
+    position: absolute !important;
+    top: var(--rubi-y, 0) !important;
+    left: var(--rubi-x, 0) !important;
+    z-index: 1;
+    width: var(--rubi-w, min(46vw, 13.5rem)) !important;
+    height: auto !important;
+    margin: 0 !important;
+  }
+  #faq > div {
+    grid-area: list;
+    margin-top: var(--faq-list-gap, 1rem) !important;
+  }
+
+  /* ── CTA-баннер: заголовок и кнопка друг под другом ─────────── */
+
+  .stage-after-hero-transition .u-cta-band {
+    /* До подвала — тот же 1rem, что от вопросов до полосы. */
+    margin-bottom: 1rem !important;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.75rem 1.25rem;
+    text-align: center;
+  }
+  .u-cta-band .u-heading {
+    line-height: 1 !important;
+  }
+  .u-cta-band .u-cta-band-btn {
+    align-self: center;
+    margin-left: 0;
+    width: auto !important;
+    height: auto !important;
+    white-space: nowrap;
+    padding: 0.75rem 1.75rem !important;
+    font-size: 1.25rem !important;
+  }
+
+  /* ── Подвал: кнопки мессенджеров — круглые, а не во всю ширину ── */
+
+  /* Класс повторён: иначе общее правило потока (0,4,0) сильнее. */
+  footer .u-msgr.u-msgr.u-msgr.u-msgr {
+    align-self: flex-start;
+    width: 2.75rem !important;
+    height: 2.75rem !important;
+  }
+
+  /* ── Первый экран ───────────────────────────────────────────── */
+
+  /*
+    Шапка: звонок — логотип по центру — меню (MobileHeader.tsx). Десктопные
+    пункты — меню из трёх ссылок, соцсети, номер — уходят в меню.
+  */
+  .hero-static-header > .site-header-slot {
+    display: none;
+  }
+  /*
+    Шапка — три капсулы, как у плавающей шапки: звонок, логотип, меню.
+    Стоит сразу под строкой состояния и на той же высоте, что плавающая, —
+    при смене одной на другую ничего не прыгает. На iPhone к отступу
+    прибавлен запас первого экрана (--hero-runway): страница открыта
+    прокрученной на него.
+  */
+  .m-header {
+    position: absolute;
+    top: calc(var(--hero-runway, 0rem) + env(safe-area-inset-top) + 0.375rem);
+    right: var(--m-gutter);
+    left: var(--m-gutter);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 2.75rem;
+  }
+  /* Логотип — в стеклянной капсуле того же вида, что кнопки: читается на любом кадре. */
+  .m-header-logo {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 8.5rem;
+    height: 2.75rem;
+    padding: 0.25rem 1rem;
+    border: 1px solid rgb(14 23 54 / 0.06);
+    border-radius: var(--radius-pill);
+    background: rgb(255 255 255 / 0.9);
+    box-shadow: 0 0.375rem 1rem rgb(28 17 23 / 0.14);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    translate: -50% 0;
+  }
+  .m-header-logo > a {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  /*
+    В капсуле логотип всегда тёмный: на тёмном кадре залов его делали белым
+    фильтром (halls.css), и на белой капсуле он пропадал. Вес селектора —
+    выше, чем у .halls-hero .site-header-logo.
+  */
+  .m-header .m-header-logo img {
+    object-fit: contain;
+    filter: none;
+  }
+
+  /* Сцена первого экрана — по ширине окна, а не 1440. */
+  #hero .stage {
+    width: auto;
+  }
+
+  /* Фон — фото вместо роликов; занавес прятал загрузку видео, он не нужен. */
+  #hero .hero-mobile-photo {
+    display: block;
+  }
+  #hero .hero-zoom,
+  #hero .hero-curtain {
+    display: none;
+  }
+
+  /* Текстовый блок — у нижнего края кадра: заголовок, подзаголовок, кнопки. */
+  #hero .hero-interface-layer > .absolute {
+    left: var(--m-gutter);
+    right: var(--m-gutter);
+    top: auto;
+    bottom: max(1.75rem, calc(env(safe-area-inset-bottom) + 1rem));
+    width: auto;
+    transform: none !important;
+  }
+  #hero .hero-interface-layer .flex {
+    flex-wrap: wrap;
+  }
+  #hero .hero-interface-layer .mt-51 {
+    margin-top: 1.25rem;
+  }
+
+  /*
+    Вуаль: снизу — плотная, под текстом; сверху — лёгкая, чтобы логотип и
+    кнопки шапки читались на светлом потолке кадра.
+  */
+  #hero .hero-veil {
+    background-image:
+      linear-gradient(
+        to top,
+        rgb(252 225 227 / 0.94) 0%,
+        rgb(252 225 227 / 0.8) 34%,
+        rgb(252 225 227 / 0) 58%
+      ),
+      linear-gradient(
+        to bottom,
+        rgb(252 225 227 / 0.55) 0%,
+        rgb(252 225 227 / 0) 16%
+      ) !important;
+  }
+}
+
+/* На десктопе фото первого экрана не показываем (и не грузим — см. Hero.tsx). */
+.hero-mobile-photo {
+  display: none;
+}
+/* Ролик и градиент под текст — только телефону, см. блок до 767 ниже. */
+.hero-mobile-video,
+.hero-mobile-shade {
+  display: none;
+}
+
+/*
+  Мобильная шапка — только ниже 1024. Прячем её под своим @media, а не
+  голым правилом: стоя после блока выше с той же специфичностью, оно
+  перебивало бы display: flex и на телефоне.
+*/
+@media (min-width: 1024px) {
+  .m-header {
+    display: none;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Первый экран телефона (до 767) — кадр hero-mobile-2.
+
+   Кадр собран под экран телефона (853×1844, те же пропорции, что 375×812,
+   390×844 и 430×932), поэтому Руи и башню не двигаем: фон ложится целиком,
+   cover + center top.
+
+   --hero-art-h — высота «холста» кадра. Кадр ложится по ширине экрана,
+   а если экран выше — по высоте: max(100svh, ширина × 1844/853). Так
+   картинка не растягивается сверх нужного, а проценты градиента и места
+   под текст считаются от самого кадра: бокал кончается на 52% его высоты,
+   лицо — на 39%.
+
+   Порядок важности: лицо Руи и сцена → заголовок → «Связаться».
+   Стоит после блока до 1024 — перекрывает его правила первого экрана.
+   ───────────────────────────────────────────────────────────── */
+
+@media (max-width: 767.98px) {
+  :root {
+    /* 216.26vw — пропорции ролика 652×1410. */
+    --hero-art-h: max(100svh, 216.26vw);
+    /*
+      Запас первого экрана под часами iPhone (lib/heroRunway.ts): 0, пока
+      скрипт не поставил на <html> признак data-runway, тогда — 4rem, чуть
+      больше строки состояния.
+    */
+    --hero-runway: 0rem;
+
+    /* 360 → 41px, 390 → 44.5px, от 421 — 48px. */
+    /*
+      Кегль — по самой длинной строке, «В САНКТ-ПЕТЕРБУРГЕ»: она занимает
+      9.15em (замерено в Fira Sans Condensed Black с трекингом 4%) и должна
+      стоять в одну строку между полями 16px. 375 → 37px, 402 → 40px,
+      430 → 43px. Три строки вместо четырёх — заголовок ниже на строку,
+      и кнопки остаются над панелью браузера.
+    */
+    --text-hero: clamp(2rem, calc((100vw - 2rem) / 9.2), 3rem);
+    --text-hero--line-height: 0.92;
+    --text-hero-lede: 1.0625rem;
+    --text-hero-lede--line-height: 1.35;
+  }
+
+  /*
+    Телефон — одна колонка, шире экрана здесь ничего быть не должно. Но
+    карточки въезжают сбоку (например, .wm-card в «Адресах» при листании),
+    и на время анимации страница становилась шире окна: на iPhone
+    её можно было сдвинуть пальцем вбок. clip, а не hidden: не создаёт
+    области прокрутки и не ломает sticky.
+  */
+  html,
+  body {
+    overflow-x: clip;
+  }
+
+  /*
+    Страница заходит под строку состояния (viewport-fit=cover в layout.tsx),
+    поэтому к отступу якорей прибавлен её рост: иначе после перехода из меню
+    заголовок раздела вставал бы под часы и значки iPhone.
+  */
+  [data-section],
+  .u-cta-band,
+  .halls-card {
+    scroll-margin-top: calc(8.25rem + env(safe-area-inset-top));
+  }
+  #halls,
+  #packages,
+  #price,
+  #contact {
+    scroll-margin-top: calc(4.5rem + env(safe-area-inset-top));
+  }
+
+  /*
+    Высота — не меньше экрана, но может расти: если текст на низком экране
+    не помещается ниже бокала, первый экран становится чуть длиннее, а шрифт
+    не мельчает. svh — чтобы адресная строка не дёргала композицию.
+  */
+  html[data-runway] {
+    --hero-runway: 4rem;
+  }
+
+  /*
+    Первый экран выше на запас под часами: страница открыта прокрученной на
+    него, поэтому видимая часть по-прежнему ровно экран, и заголовок с
+    кнопками стоят там же, где и без запаса, — над панелью Safari.
+  */
+  .hero-halls-scene,
+  .hero-halls-sticky {
+    height: auto;
+    min-height: calc(100svh + var(--hero-runway));
+  }
+  #hero {
+    display: flex;
+    flex-direction: column;
+    height: auto;
+    min-height: calc(100svh + var(--hero-runway));
+    /*
+      Цвет низа градиента — ровно фон страницы (--color-blush, как у body):
+      иначе на границе со вторым блоком виден стык.
+    */
+    background: var(--color-blush);
+  }
+
+  #hero .hero-mobile-photo img {
+    bottom: auto;
+    height: var(--hero-art-h);
+    object-position: center top;
+  }
+
+  /*
+    Ролик — ровно на месте постера. Пока не пошёл, прозрачен: иначе на
+    загрузке мелькнул бы чёрный прямоугольник вместо кадра.
+  */
+  #hero .hero-mobile-video {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    display: block;
+    width: 100%;
+    height: var(--hero-art-h);
+    object-fit: cover;
+    object-position: center top;
+    opacity: 0;
+    transition: opacity 240ms var(--ease-out);
+  }
+  #hero .hero-mobile-video[data-playing="true"] {
+    opacity: 1;
+  }
+
+  /* Прежняя вуаль выбеливала персонажа — на телефоне её заменяет градиент. */
+  #hero .hero-veil {
+    display: none;
+  }
+  #hero .hero-mobile-shade {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    display: block;
+    height: var(--hero-art-h);
+    /*
+      Два слоя. Основной — сверху вниз: до 58% кадр чистый (персонаж с
+      бокалом и пиджак), дальше плотность растёт по плавной кривой — много
+      промежуточных точек, без заметной «ступеньки» — и к 88% кадра это
+      сплошной фон страницы, без стыка со следующим блоком.
+    */
+    background: linear-gradient(
+      to bottom,
+      rgb(252 225 227 / 0) 58%,
+      rgb(252 225 227 / 0.06) 62%,
+      rgb(252 225 227 / 0.18) 66%,
+      rgb(252 225 227 / 0.38) 70%,
+      rgb(252 225 227 / 0.6) 74%,
+      rgb(252 225 227 / 0.8) 78%,
+      rgb(252 225 227 / 0.93) 82%,
+      rgb(252 225 227 / 0.99) 86%,
+      var(--color-blush) 89%,
+      var(--color-blush) 100%
+    );
+  }
+  /*
+    Второй слой — только слева, под заголовком: заголовок начинается выше,
+    чем основной градиент набирает плотность, и тёмно-синий текст иначе
+    сливался бы с синей скатертью слева. Персонаж — по центру и справа —
+    этим слоем почти не задет.
+  */
+  #hero .hero-mobile-shade::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      to right,
+      rgb(252 225 227 / 0.86) 0%,
+      rgb(252 225 227 / 0.62) 30%,
+      rgb(252 225 227 / 0.22) 52%,
+      rgb(252 225 227 / 0) 68%
+    );
+    -webkit-mask-image: linear-gradient(to bottom, transparent 43%, #000 54%, #000 100%);
+    mask-image: linear-gradient(to bottom, transparent 43%, #000 54%, #000 100%);
+  }
+
+  /* Сцена и слой текста — в поток: текст прижат к низу, но не выше бокала. */
+  /*
+    width и margin сброшены явно: у .stage margin-inline: auto, а в колонке
+    flex авто-отступы не дают блоку растянуться — он сжимался до ширины
+    текста и центрировался, и поля выходили 30…57px вместо 16.
+  */
+  #hero .stage {
+    position: relative;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    width: 100%;
+    height: auto;
+    margin-inline: 0;
+  }
+  #hero .hero-interface-layer:not(.hero-static-header) {
+    position: relative;
+    inset: auto;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    justify-content: flex-end;
+    /*
+      Сверху — не выше 50% кадра (бокал кончается на 52%): текст прижат к низу
+      экрана и поднимается к бокалу, только если экран низкий.
+
+      Снизу — без прибавки к safe-area: 100svh в Safari уже считается над
+      панелью браузера, и прежние «safe-area + 12px» при viewport-fit=cover
+      складывались в лишние 46px, уводя кнопки под панель.
+    */
+    padding: calc(var(--hero-art-h) * 0.5) var(--m-gutter)
+      max(1.25rem, env(safe-area-inset-bottom));
+  }
+  #hero .hero-interface-layer > .absolute {
+    position: relative;
+    inset: auto;
+    width: auto;
+  }
+
+  /*
+    Низкий экран (iPhone SE и любой телефон, где панели браузера отняли
+    много места): «Связаться» важнее чистого кадра, поэтому текст может
+    подняться на бокал, лишь бы кнопки остались на экране. Подложка под
+    заголовком поднимается вместе с ним.
+  */
+  @media (max-height: 640px) {
+    #hero .hero-interface-layer:not(.hero-static-header) {
+      padding-top: calc(var(--hero-art-h) * 0.4);
+    }
+    #hero .hero-mobile-shade::before {
+      -webkit-mask-image: linear-gradient(to bottom, transparent 34%, #000 45%, #000 100%);
+      mask-image: linear-gradient(to bottom, transparent 34%, #000 45%, #000 100%);
+    }
+  }
+
+  /*
+    Заголовок — ровно три строки, как на десктопе. Раньше ширина была
+    ограничена 7.2em в расчёте на перенос после дефиса, но буквы печатаются
+    отдельными span, и Safari между ними перенос не находил: строка
+    «В САНКТ-ПЕТЕРБУРГЕ» вылезала за экран. Теперь она не переносится,
+    а помещается за счёт кегля (--text-hero выше).
+  */
+  #hero h1 {
+    white-space: nowrap;
+  }
+
+  #hero .hero-interface-layer p.mt-19 {
+    margin-top: 1rem;
+    letter-spacing: 0.01em;
+  }
+
+  /* ── Кнопки: одна строка, поровну, 52px ─────────────────────── */
+
+  #hero .hero-interface-layer .mt-51 {
+    flex-wrap: nowrap;
+    gap: 0.75rem;
+    margin-top: 1.25rem;
+  }
+  #hero .hero-pop {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+  #hero .hero-pop > .u-cta {
+    width: 100%;
+    height: 3.25rem;
+    padding-inline: 0.75rem;
+    font-size: 1.25rem;
+    line-height: 1;
+    white-space: nowrap;
+    /* Тень макета рассчитана на видео — на светлом низу она грязнит. */
+    box-shadow: 0 0.5rem 1.25rem rgb(28 17 23 / 0.14) !important;
+    transition:
+      transform 160ms cubic-bezier(0.23, 1, 0.32, 1),
+      background-color 160ms var(--ease-out),
+      color 160ms var(--ease-out);
+  }
+  #hero .hero-pop > .u-cta:active {
+    transform: scale(0.97);
+  }
+  /* «Выбрать зал» — светлая вторичная. */
+  #hero .hero-pop > [data-hero-halls-trigger] {
+    border-color: rgb(14 23 54 / 0.08);
+    background-color: rgb(255 255 255 / 0.9);
+    color: var(--color-ink);
+    font-weight: 600;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   «Выбери зал» ниже 1024 — HallsMobile.tsx
+   ───────────────────────────────────────────────────────────── */
+
+/* ─────────────────────────────────────────────────────────────
+   Reels на сенсорном экране — режим касания в Reels.tsx
+
+   По устройству ввода, а не по ширине: планшет в горизонтали шире 1024,
+   но наведения там так же нет. Полоска прогресса и кнопка play здесь;
+   на курсоре полоски нет, а кнопка прячется по наведению (globals.css).
+   ───────────────────────────────────────────────────────────── */
+
+.u-reel-progress {
+  display: none;
+}
+
+@media (hover: none) {
+  .u-reel-progress {
+    position: absolute;
+    right: 0.875rem;
+    bottom: 0.875rem;
+    left: 0.875rem;
+    z-index: 2;
+    display: block;
+    height: 0.1875rem;
+    overflow: hidden;
+    border-radius: var(--radius-pill);
+    background: rgb(255 255 255 / 0.32);
+    pointer-events: none;
+  }
+  .u-reel-progress i {
+    display: block;
+    height: 100%;
+    background: var(--color-surface);
+    transform: scaleX(0);
+    transform-origin: left center;
+  }
+
+  /* Ролик идёт — кнопка уходит; встал на паузу — возвращается поверх кадра. */
+  .u-reel[data-running="true"] .u-reel-play {
+    opacity: 0;
+    scale: 0.86;
+  }
+  .u-reel:active .u-reel-play {
+    scale: 0.92;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   «Как выглядит праздник» ниже 1024 — GalleryMobile.tsx
+
+   Сетка 2/1/2: маленькие места — вертикальные снимки (5:7), большое —
+   горизонтальные (3:2), ровно в пропорциях самих файлов. Снимки сменяют
+   друг друга сами; здесь только сетка и перетекание кадра.
+
+   На десктопе блок и «Выбери зал» для телефона скрыты правилом в конце
+   файла — именно в конце: стоя раньше базовых правил с display: grid, оно
+   при равном весе им проигрывало, и оба блока рисовались поверх макета.
+   ───────────────────────────────────────────────────────────── */
+
+/* На планшете сетка не растягивается во всю колонку: иначе блок снова длинный. */
+.gallery-mix {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.625rem;
+  width: 100%;
+  max-width: 30rem;
+  margin-inline: auto;
+}
+
+/*
+  Скругление не меньше запечённого в файлы (28 макетных px на 2×): при
+  меньшем в углах проглядывали бы прозрачные уголки самого снимка.
+*/
+.gallery-mix-cell {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 5 / 7;
+  border-radius: 1.75rem;
+  background: var(--color-surface-alt);
+  isolation: isolate;
+}
+.gallery-mix-cell[data-wide="true"] {
+  grid-column: 1 / -1;
+  aspect-ratio: 3 / 2;
+}
+
+.gallery-mix-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+}
+
+/*
+  Новый кадр проявляется поверх прежнего и чуть «приезжает» из приближения.
+  Медленнее интерфейсных анимаций: это смена фотографии, а не отклик на
+  нажатие, и резкость читалась бы как мигание. Но короче такта смены (1.8с),
+  чтобы проявление не наслаивалось на следующую смену.
+*/
+.gallery-mix-img[data-fresh="true"] {
+  animation: gallery-mix-in 900ms var(--ease-out) both;
+}
+@keyframes gallery-mix-in {
+  from {
+    opacity: 0;
+    scale: 1.06;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   «Выбери пакет» ниже 1024 — PackagesCarousel.tsx
+
+   Лента по одной карточке, как выбор зала: пилюли сверху, точки снизу,
+   соседние карточки выглядывают по краям. Карточки серверные, собраны по
+   координатам макета; здесь они раскладываются столбцом: название и цена по
+   центру, состав тремя плашками, внизу Руби, которого перекрывает «Выбрать».
+   ───────────────────────────────────────────────────────────── */
+
+.pk-ribbon {
+  display: none;
+}
+
+@media (max-width: 1023.98px) {
+  /*
+    Светлая подложка под три шага — пакет, дата, заявка. На десктопе её
+    рисует декоративный слой (packages-band.svg, #FFF1F2 → #FFF9F7), на
+    телефоне он скрыт, и розовая карточка «Хэппи» сливалась с фоном страницы.
+    Одна полоса на три секции: зазоры между ними — внутренние поля.
+  */
+  #packages,
+  #price,
+  #contact {
+    max-width: none;
+    margin-inline: calc(-1 * var(--m-gutter));
+    padding-inline: var(--m-gutter);
+  }
+  #packages {
+    margin-bottom: 0;
+    /*
+      Сверху — поле под волну «Личного менеджера»: без него номер шага
+      вставал вплотную к тёмной волне (14…55px по ширине экрана).
+    */
+    padding-top: 1.75rem;
+    padding-bottom: 3.5rem;
+    background: linear-gradient(#fff1f2, #fff4f3);
+  }
+  #price {
+    margin-bottom: 0;
+    padding-bottom: 3.5rem;
+    background: linear-gradient(#fff4f3, #fff7f5);
+  }
+  #contact {
+    padding-bottom: 2.5rem;
+    border-radius: 0 0 2rem 2rem;
+    background: linear-gradient(#fff7f5, #fff9f7);
+  }
+
+  /* ── Лента ──────────────────────────────────────────────── */
+
+  #packages .pk-carousel {
+    display: grid;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0;
+  }
+  /*
+    Пилюли — над лентой: лента заезжает под них своим верхним полем (оно
+    нужно под бант «наш выбор»), и без этого поле перехватывало бы нажатия.
+  */
+  #packages .pk-carousel > .hm-tabs {
+    position: relative;
+    z-index: 5;
+  }
+  /*
+    Поля ленты: сверху — под ленточку «наш выбор», которая выступает над
+    карточкой, и под рамку выбранного пакета; по бокам — под соседей.
+  */
+  /*
+    Карточки одного размера: слайды тянутся на высоту самой длинной
+    («Вау»), карточка — на весь слайд, подвал с Руби прижат к низу.
+    Сверху поле под бант «наш выбор» — он выступает над карточкой. Поле
+    заезжает под пилюли (margin-top), чтобы между пилюлями и карточкой не
+    было лишней полосы: у самого банта вокруг много прозрачного.
+
+    Поля по бокам — как у Reels: карточка почти во всю ширину, соседи
+    выглядывают полоской; на планшете карточка не шире 25rem.
+  */
+  /*
+    Пилюли и карточка должны помещаться в экран целиком (≈720px между часами
+    и панелью Safari). Поэтому поле под бант — 28px, а не 36: бант меньше
+    и выступает над карточкой почти ровно на это поле.
+  */
+  #packages .pk-track {
+    display: flex;
+    align-items: stretch;
+    margin: -2.25rem calc(-1 * var(--m-gutter)) 0;
+    padding: 3.25rem max(1.75rem, calc((100vw - 25rem) / 2)) 0.75rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+  #packages .pk-track::-webkit-scrollbar {
+    display: none;
+  }
+  #packages .pk-slide {
+    display: flex;
+    flex: 0 0 100%;
+    padding: 0 0.25rem;
+    scroll-snap-align: center;
+    scroll-snap-stop: always;
+  }
+  #packages .pk-frame {
+    position: relative;
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    padding: 0;
+    transform-origin: top center;
+    transition:
+      opacity 320ms var(--ease-out),
+      scale 320ms var(--ease-out);
+  }
+  #packages .pk-slide[data-current="false"] .pk-frame {
+    opacity: 0.45;
+    scale: 0.92;
+  }
+  /*
+    Сосед уменьшается к стороне текущей карточки: от центра он уходил бы
+    из видимой полоски у края экрана, и попасть по нему пальцем было нечем.
+  */
+  #packages .pk-slide[data-side="prev"] .pk-frame {
+    transform-origin: top right;
+  }
+  #packages .pk-slide[data-side="next"] .pk-frame {
+    transform-origin: top left;
+  }
+
+  /*
+    Бант «наш выбор» — у верхнего левого угла «Экстры», в пропорциях
+    десктопа: там он 142 из 325 ширины карточки (44%), а центр банта — в 7%
+    ширины от левого края и в 8% ширины от верхнего. Процент в margin-top
+    считается от ширины, поэтому вертикаль задана через него; translate
+    ставит бант центром в эту точку.
+  */
+  #packages .pk-ribbon {
+    position: absolute;
+    top: 0;
+    left: 6%;
+    z-index: 3;
+    display: block;
+    /* Меньше десктопных 43.8%: карточка стала плотнее, и бант её перекрывал. */
+    width: 30%;
+    height: auto;
+    max-width: none;
+    margin-top: 6%;
+    translate: -50% -50%;
+    rotate: -51deg;
+    pointer-events: none;
+    /* Появление — мягкий «прыжок» с небольшой задержкой, когда «Экстра» встала на место. */
+    transition:
+      opacity 280ms var(--ease-out) 120ms,
+      scale 560ms var(--ease-pop) 120ms;
+  }
+  /* «Экстра» не на месте — бант уходит: быстрее, чем появляется, и без прыжка. */
+  #packages .pk-slide[data-current="false"] .pk-ribbon {
+    opacity: 0;
+    scale: 0.45;
+    transition:
+      opacity 180ms var(--ease-out),
+      scale 220ms var(--ease-out);
+  }
+
+  /*
+    Выбранная пилюля — в цветах своего пакета: «Вау» тёмно-синяя с белым,
+    «Экстра» насыщенно-розовая с мягким розовым, «Хэппи» — наоборот.
+  */
+  #packages .pk-nav .hm-tab[data-theme="extra"][aria-selected="true"] {
+    background: var(--color-primary);
+    color: var(--color-blush);
+    box-shadow: 0 0.25rem 0.75rem rgb(219 64 79 / 0.32);
+  }
+  #packages .pk-nav .hm-tab[data-theme="happy"][aria-selected="true"] {
+    background: var(--color-blush);
+    color: var(--color-primary);
+    box-shadow:
+      inset 0 0 0 1px rgb(219 64 79 / 0.18),
+      0 0.25rem 0.75rem rgb(219 64 79 / 0.16);
+  }
+  #packages .pk-nav .hm-tab[data-theme="wow"][aria-selected="true"] {
+    background: var(--color-navy);
+    color: var(--color-surface);
+  }
+
+  /* Выбранная точка — тоже в цвете пакета. */
+  #packages .hm-dots.pk-nav span[data-theme="happy"][data-on="true"] {
+    background: var(--color-blush);
+    box-shadow: inset 0 0 0 1.5px var(--color-primary);
+  }
+  #packages .hm-dots.pk-nav span[data-theme="extra"][data-on="true"] {
+    background: var(--color-primary);
+    box-shadow: none;
+  }
+  #packages .hm-dots.pk-nav span[data-theme="wow"][data-on="true"] {
+    background: var(--color-navy);
+    box-shadow: none;
+  }
+
+  /*
+    «Хэппи» — светло-розовая на светло-розовой подложке: соседом, под
+    приглушением, она теряла контур. Тонкая обводка возвращает край.
+  */
+  #packages .u-package-card[data-package="happy"] {
+    box-shadow: inset 0 0 0 1.5px rgb(219 64 79 / 0.3);
+  }
+
+  /* ── Карточка ───────────────────────────────────────────── */
+
+  /*
+    Колонка: название, цена, подзаголовок — и состав тремя подписанными
+    блоками, в одном порядке во всех карточках, чтобы пакеты сравнивались
+    построчно:
+      «Во всех пакетах» — общее, мелкой строкой через точку;
+      «В пакете»        — чем пакеты отличаются (депозит на еду, микрофоны,
+                          сервировка) — на плашке: это главное при выборе;
+      «Дополнительно»   — добавки пакета с плюсом; у «Хэппи» их нет, так и
+                          написано — блоки стоят на тех же местах.
+    Подписи блоков — ::before самих групп. Порядок задан order: в разметке
+    группы стоят так, как удобно десктопу с координатами макета.
+
+    Карточки одной высоты — по самой длинной («Вау»): свободное место у
+    коротких — перед кнопкой, и кнопки стоят на одном уровне.
+
+    Приглушение соседей и «наведение» с десктопа здесь не нужны: соседей
+    приглушает лента, выбранный пакет отмечен рамкой.
+  */
+  #packages .u-package-card {
+    flex: 1;
+    gap: 0;
+    padding: 1.125rem 1rem 1rem;
+    border-radius: 1.5rem;
+    filter: none !important;
+    scale: 1 !important;
+    translate: none !important;
+  }
+
+  #packages .u-package-head {
+    order: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.0625rem;
+    padding: 0;
+    text-align: center;
+  }
+  #packages .u-package-name {
+    font-size: 1.1875rem !important;
+    line-height: 1.2 !important;
+    opacity: 0.9;
+  }
+  #packages .u-package-price {
+    font-size: 1.75rem !important;
+    line-height: 1.1 !important;
+    white-space: nowrap;
+  }
+  #packages .u-package-lede {
+    order: 1;
+    margin-top: 0.375rem;
+    font-size: 0.8125rem !important;
+    line-height: 1.4 !important;
+    text-align: center;
+    text-wrap: balance;
+    opacity: 0.85;
+  }
+  /* Линию под ценой заменяют подписи блоков. */
+  #packages .u-package-rule {
+    display: none !important;
+  }
+
+  /*
+    ── Три блока состава ──
+    Без подписей — блоки различаются видом, каждый пункт на своей строке:
+      общее для всех пакетов — строки с точкой, чуть тише остального;
+      своё у пакета          — на плашке, строки с галочкой;
+      добавки                — строки с плюсом.
+  */
+  #packages .u-package-group {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.3125rem;
+    margin-top: 0.875rem;
+    padding: 0;
+    text-align: left;
+  }
+  #packages .u-package-base {
+    order: 2;
+  }
+  #packages .u-package-own {
+    order: 3;
+    align-self: stretch;
+    padding: 0.6875rem 0.75rem;
+    border-radius: 0.875rem;
+    background: color-mix(in srgb, currentColor 9%, transparent);
+  }
+  #packages .u-package-extras {
+    order: 4;
+  }
+
+  /* Все строки состава: значок слева, текст рядом. */
+  #packages .u-package-group > * {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.4375rem;
+    font-size: 0.875rem !important;
+    line-height: 1.3 !important;
+  }
+  #packages .u-package-base > * {
+    opacity: 0.85;
+  }
+  /* Точка у общего — тише галочки и плюса: это есть у всех. */
+  #packages .u-package-base > *::before {
+    content: "";
+    flex: none;
+    width: 1rem;
+    height: 1.3em;
+    background: radial-gradient(circle, currentColor 0 0.1875rem, transparent 0.2125rem)
+      center / 1rem 1rem no-repeat;
+  }
+  /*
+    Галочка у депозита — внутри самой кнопки меню, а не у строки: иначе
+    нажатие по значку попадало мимо кнопки, и карточка выбирала пакет.
+  */
+  #packages .u-package-own > :not(:has(.u-food-trigger))::before,
+  #packages .u-package-own .u-food-trigger::before,
+  #packages .u-package-extras > :not(.u-package-empty)::before {
+    content: "";
+    flex: none;
+    width: 1rem;
+    height: 1rem;
+    margin-top: 0.05em;
+    background: currentColor;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Cpath d='M4 9.4l3.2 3.1L14 5.5' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+      center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Cpath d='M4 9.4l3.2 3.1L14 5.5' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")
+      center / contain no-repeat;
+  }
+  #packages .u-package-extras > :not(.u-package-empty)::before {
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Cpath d='M9 4v10M4 9h10' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 18 18'%3E%3Cpath d='M9 4v10M4 9h10' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+  }
+  #packages .u-package-own .u-food-trigger {
+    gap: 0.4375rem;
+    text-align: left;
+  }
+  #packages .u-package-empty {
+    opacity: 0.6;
+  }
+  #packages .u-package-mark {
+    display: none;
+  }
+
+  /* ── Кнопка ─────────────────────────────────────────────── */
+
+  /*
+    Руби на телефоне нет: вместе с кнопкой он занимал четверть карточки,
+    а карточки и так высотой почти в экран. На десктопе он на месте.
+  */
+  #packages .u-package-mascot {
+    display: none !important;
+  }
+  /* Кнопка прижата к низу: у коротких карточек свободное место — над ней. */
+  #packages .u-package-foot {
+    order: 5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: auto;
+    padding: 1rem 0 0;
+  }
+  #packages .u-package-foot .u-chip {
+    width: 100% !important;
+    height: 2.75rem !important;
+    font-size: 1.25rem !important;
+    box-shadow: 0 0.5rem 1.25rem rgb(14 23 54 / 0.18);
+  }
+
+  /* Перестановка круга: без анимаций, иначе карточка отыграла бы появление заново. */
+  #packages .pk-track[data-jumping] .pk-frame {
+    transition: none !important;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   «Выбери дату» ниже 1024 — DatePriceMobile.tsx
+
+   Календарь без цен в ячейках (тариф — цветом, цены — плашками под
+   сеткой), пакет и часы одной карточкой, итог с кнопкой заявки.
+   Десктопные карточки по координатам макета здесь скрыты.
+   ───────────────────────────────────────────────────────────── */
+
+@media (max-width: 1023.98px) {
+  #price > [data-node-id="914:1564"],
+  #price > [data-node-id="914:1777"],
+  #price > [data-node-id="914:1761"],
+  #price > [data-node-id="914:1753"],
+  #price > [data-node-id="914:1799"] {
+    display: none !important;
+  }
+
+  .dp-mobile {
+    display: grid;
+    gap: 0.75rem;
+    width: 100%;
+    max-width: 30rem;
+    margin-inline: auto;
+    font-family: var(--font-sans);
+    color: var(--color-ink);
+  }
+
+  .dp-card {
+    padding: 1rem;
+    border-radius: 1.5rem;
+    background: var(--color-surface);
+    box-shadow: var(--shadow-card-lg);
+  }
+
+  .dp-round {
+    display: grid;
+    flex: none;
+    width: 2.5rem;
+    height: 2.5rem;
+    place-items: center;
+    border: 1px solid var(--color-border-soft);
+    border-radius: var(--radius-pill);
+    background: var(--color-surface);
+    color: var(--color-ink);
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      background-color 160ms var(--ease-out),
+      color 160ms var(--ease-out),
+      scale 160ms var(--ease-out);
+  }
+  .dp-round svg {
+    width: 1rem;
+    height: 1rem;
+  }
+  .dp-round:not(:disabled):active {
+    scale: 0.92;
+    background: var(--color-blush);
+    color: var(--color-primary);
+  }
+  .dp-round:disabled {
+    opacity: 0.35;
+  }
+
+  /* ── Календарь ──────────────────────────────────────────── */
+
+  .dp-month {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .dp-month-title {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+  }
+
+  .dp-weekdays,
+  .dp-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 0.25rem;
+  }
+  .dp-weekdays {
+    margin: 0.75rem 0 0.375rem;
+    color: var(--color-ink-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-align: center;
+  }
+  .dp-weekdays [data-weekend="true"] {
+    color: var(--color-primary);
+  }
+
+  /* Свайп по сетке — месяц; вертикально листается страница. */
+  .dp-grid {
+    touch-action: pan-y;
+    animation: dp-month-in 280ms var(--ease-out) both;
+  }
+  .dp-grid[data-dir="prev"] {
+    animation-name: dp-month-in-prev;
+  }
+  @keyframes dp-month-in {
+    from {
+      opacity: 0;
+      translate: 1.25rem 0;
+    }
+  }
+  @keyframes dp-month-in-prev {
+    from {
+      opacity: 0;
+      translate: -1.25rem 0;
+    }
+  }
+
+  /* Ячейка — только число; тариф — цветом, как в легенде ниже. */
+  .dp-day {
+    position: relative;
+    display: grid;
+    aspect-ratio: 1;
+    place-items: center;
+    border: 1px solid transparent;
+    border-radius: 0.75rem;
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font-size: 0.9375rem;
+    font-weight: 700;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      background-color 160ms var(--ease-out),
+      color 160ms var(--ease-out),
+      scale 160ms var(--ease-out);
+  }
+  .dp-day[data-group="0"] {
+    border-color: var(--color-border-soft);
+  }
+  .dp-day[data-group="1"] {
+    background: var(--color-surface-alt);
+  }
+  .dp-day[data-group="2"] {
+    background: var(--color-blush);
+  }
+  .dp-day[data-past] {
+    border-color: transparent;
+    background: transparent;
+    color: rgb(14 23 54 / 0.28);
+    font-weight: 500;
+  }
+  /* Сегодня — точка под числом. */
+  .dp-day[data-today]::after {
+    content: "";
+    position: absolute;
+    bottom: 0.3rem;
+    left: 50%;
+    width: 0.25rem;
+    height: 0.25rem;
+    margin-left: -0.125rem;
+    border-radius: var(--radius-pill);
+    background: currentColor;
+  }
+  .dp-day:not(:disabled):active {
+    scale: 0.92;
+  }
+  .dp-day[aria-pressed="true"] {
+    border-color: transparent;
+    background: var(--color-primary);
+    color: var(--color-surface);
+    box-shadow: 0 0.375rem 0.875rem rgb(219 64 79 / 0.35);
+    animation: dp-pop 260ms var(--ease-pop);
+  }
+  @keyframes dp-pop {
+    from {
+      scale: 0.86;
+    }
+  }
+
+  /* Тарифы: плашки в строку, у выбранного — красная рамка. */
+  .dp-tiers {
+    display: grid;
+    gap: 0.375rem;
+    margin-top: 0.875rem;
+  }
+  .dp-tier-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.3125rem;
+  }
+  .dp-tier-period {
+    flex-basis: 100%;
+    color: var(--color-ink-muted);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+  .dp-tier {
+    display: inline-flex;
+    flex: 1 1 auto;
+    align-items: baseline;
+    justify-content: center;
+    gap: 0.25rem;
+    padding: 0.375rem 0.25rem;
+    border: 1px solid transparent;
+    border-radius: 0.625rem;
+    color: var(--color-ink-secondary);
+    font-size: 0.6875rem;
+    white-space: nowrap;
+    transition:
+      border-color 200ms var(--ease-out),
+      color 200ms var(--ease-out),
+      box-shadow 200ms var(--ease-out);
+  }
+  .dp-tier b {
+    color: var(--color-ink);
+    font-weight: 700;
+  }
+  .dp-tier[data-group="0"] {
+    border-color: var(--color-border-soft);
+  }
+  .dp-tier[data-group="1"] {
+    background: var(--color-surface-alt);
+  }
+  .dp-tier[data-group="2"] {
+    background: var(--color-blush);
+  }
+  .dp-tier[data-on="true"] {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+    box-shadow: 0 0 0 1px var(--color-primary);
+    font-weight: 700;
+  }
+
+  /* ── Пакет и часы ───────────────────────────────────────── */
+
+  .dp-options {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    gap: 0.875rem;
+  }
+  .dp-col {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .dp-label {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-height: 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 700;
+  }
+  .dp-ours {
+    padding: 0.0625rem 0.375rem;
+    border-radius: var(--radius-pill);
+    background: var(--color-blush);
+    color: var(--color-primary);
+    font-size: 0.625rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .dp-packages {
+    display: grid;
+    gap: 0.375rem;
+  }
+  .dp-package {
+    display: flex;
+    align-items: center;
+    gap: 0.4375rem;
+    min-height: 2.75rem;
+    padding: 0 0.625rem;
+    border: 1px solid var(--color-border-soft);
+    border-radius: 0.875rem;
+    background: var(--color-surface);
+    color: var(--color-ink);
+    text-align: left;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      border-color 180ms var(--ease-out),
+      background-color 180ms var(--ease-out),
+      box-shadow 180ms var(--ease-out),
+      scale 160ms var(--ease-out);
+  }
+  .dp-package i {
+    flex: none;
+    width: 0.625rem;
+    height: 0.625rem;
+    border-radius: var(--radius-pill);
+    background: var(--dot);
+    box-shadow: inset 0 0 0 1px rgb(219 64 79 / 0.35);
+  }
+  .dp-package-name {
+    font-size: 0.875rem;
+    font-weight: 700;
+  }
+  .dp-package-price {
+    margin-left: auto;
+    color: var(--color-ink-secondary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .dp-package:active {
+    scale: 0.97;
+  }
+  .dp-package[aria-pressed="true"] {
+    border-color: var(--color-border-soft);
+    background: var(--color-surface-alt);
+  }
+  .dp-package[data-firm="true"] {
+    border-color: var(--color-primary);
+    box-shadow: inset 0 0 0 1px var(--color-primary);
+  }
+  .dp-package[aria-pressed="true"] .dp-package-price {
+    color: var(--color-ink);
+  }
+
+  .dp-hours {
+    align-items: center;
+    padding: 0 0 0 0.875rem;
+    border-left: 1px solid rgb(14 23 54 / 0.08);
+  }
+  .dp-hours .dp-label {
+    align-self: stretch;
+    justify-content: center;
+  }
+  .dp-hours-value {
+    margin-top: 0.25rem;
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 800;
+    line-height: 1;
+  }
+  .dp-hours-value b {
+    display: inline-block;
+    font-size: 3rem;
+    animation: dp-pop 260ms var(--ease-pop);
+  }
+  .dp-stepper {
+    display: flex;
+    gap: 0.625rem;
+  }
+  .dp-stepper .dp-round {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+  .dp-hours-note {
+    color: var(--color-ink-muted);
+    font-size: 0.75rem;
+  }
+
+  /* ── Итог ───────────────────────────────────────────────── */
+
+  .dp-total {
+    padding: 1.125rem 1.125rem 1rem;
+    border-radius: 1.5rem;
+    background: linear-gradient(135deg, #0e1736 0%, #28314c 100%);
+    color: var(--color-surface);
+    box-shadow: 0 1rem 2rem rgb(14 23 54 / 0.25);
+  }
+  .dp-total-label {
+    color: rgb(255 255 255 / 0.7);
+    font-size: 0.8125rem;
+    font-weight: 600;
+  }
+  .dp-total-sum {
+    margin-top: 0.125rem;
+    font-family: var(--font-display);
+    font-size: 2.75rem;
+    font-weight: 800;
+    line-height: 1.05;
+  }
+  .dp-total-sum span {
+    display: inline-block;
+    animation: dp-sum-in 320ms var(--ease-out);
+  }
+  @keyframes dp-sum-in {
+    from {
+      opacity: 0.2;
+      translate: 0 0.375rem;
+    }
+  }
+
+  .dp-lines {
+    display: grid;
+    gap: 0.5rem;
+    margin: 0.875rem 0 1rem;
+    padding-top: 0.875rem;
+    border-top: 1px solid rgb(255 255 255 / 0.14);
+    font-size: 0.875rem;
+  }
+  .dp-lines > div {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+  .dp-lines dt {
+    display: grid;
+    color: rgb(255 255 255 / 0.82);
+  }
+  .dp-lines dt small {
+    color: rgb(255 255 255 / 0.55);
+    font-size: 0.75rem;
+  }
+  .dp-lines dd {
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  /* Белая, как остальной текст итога: розовая на синем читалась отдельным акцентом. */
+  .dp-link {
+    color: var(--color-surface);
+    text-decoration: underline;
+    text-underline-offset: 0.2em;
+  }
+
+  .dp-cta {
+    width: 100%;
+    height: 3.25rem;
+    font-size: 1.25rem;
+    background: var(--color-surface);
+    color: var(--color-primary);
+    box-shadow: none;
+    transition:
+      transform 160ms cubic-bezier(0.23, 1, 0.32, 1),
+      background-color 200ms var(--ease-out);
+  }
+  .dp-cta:active {
+    transform: scale(0.97);
+  }
+  .dp-note {
+    margin-top: 0.625rem;
+    color: rgb(255 255 255 / 0.6);
+    font-size: 0.75rem;
+    text-align: center;
+    white-space: nowrap;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   «Заполни детали» ниже 1024 — RequestForm.tsx
+
+   Семь полей подряд во всю ширину растягивали форму на полтора экрана.
+   Здесь сетка: сводка «что отправляешь» — наверху; имя и телефон — во всю
+   ширину, это главное; мессенджер — сразу под телефоном, на виду, с пометкой
+   «необязательно»; зал и гости — рядом, оба короткие списки; пожелание
+   необязательно и свёрнуто за кнопкой.
+   Поля 48px, кегль 16px — меньше iPhone приближает страницу при фокусе.
+   ───────────────────────────────────────────────────────────── */
+
+@media (max-width: 1023.98px) {
+  #contact .rf-form {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      "summary summary"
+      "name name"
+      "phone phone"
+      "messenger messenger"
+      "hall guests"
+      "more more"
+      "wish wish"
+      "consent consent"
+      "submit submit"
+      "status status";
+    gap: 0.875rem 0.625rem;
+    padding: 1rem !important;
+    border-radius: 1.5rem;
+  }
+  #contact .rf-summary { grid-area: summary; }
+  #contact .rf-name { grid-area: name; }
+  #contact .rf-phone { grid-area: phone; }
+  #contact .rf-hall { grid-area: hall; }
+  #contact .rf-guests { grid-area: guests; }
+  #contact .rf-more { grid-area: more; }
+  #contact .rf-messenger { grid-area: messenger; }
+  #contact .rf-wish { grid-area: wish; }
+  #contact .rf-consent { grid-area: consent; }
+  #contact .rf-submit { grid-area: submit; }
+  #contact .rf-status { grid-area: status; }
+
+  #contact .rf-form[data-extras="false"] .rf-wish {
+    display: none !important;
+  }
+  /*
+    Свёрнуто — схема без строки пожелания: пустые строки сетки всё равно
+    получали свои зазоры, и под кнопкой «+ …» висела пустота.
+  */
+  #contact .rf-form[data-extras="false"] {
+    grid-template-areas:
+      "summary summary"
+      "name name"
+      "phone phone"
+      "messenger messenger"
+      "hall guests"
+      "more more"
+      "consent consent"
+      "submit submit"
+      "status status";
+  }
+  /* Выпадающие списки в половину ширины — поля уже, чтобы текст не резался. */
+  #contact :is(.rf-hall, .rf-guests) select.u-field {
+    padding-left: 0.75rem !important;
+    padding-right: 2rem !important;
+  }
+  #contact :is(.rf-hall, .rf-guests) svg {
+    right: 0.75rem !important;
+  }
+
+  /* Подписи и поля. */
+  #contact .rf-form > div > label {
+    font-size: 0.8125rem !important;
+    line-height: 1.2 !important;
+  }
+  #contact .rf-form .u-field {
+    height: 3rem !important;
+    margin-top: 0.375rem !important;
+    font-size: 1rem !important;
+  }
+  #contact .rf-wish textarea.u-field {
+    height: 5.5rem !important;
+  }
+  #contact :is(.rf-phone, .rf-messenger) p {
+    margin-top: 0.25rem !important;
+    font-size: 0.75rem !important;
+  }
+
+  /* Сводка наверху: слева что выбрано, справа итог и «Изменить». */
+  /*
+    Сводка — две строки:
+      Дата · Пакет · Время  — подписанные колонки;  «Изменить» — справа;
+      Предварительно ………… сумма  — под тонкой линией, только когда дата
+                                    выбрана (без даты считать не из чего).
+  */
+  #contact .rf-summary {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "list change"
+      "total total";
+    align-items: start;
+    column-gap: 0.75rem;
+    row-gap: 0.625rem;
+    padding: 0.75rem 0.875rem !important;
+    border-radius: 1rem;
+  }
+  #contact .rf-summary:has(.u-form-total[data-empty="true"]) {
+    grid-template-areas: "list change";
+  }
+  #contact .rf-summary-list {
+    grid-area: list;
+    display: grid;
+    grid-template-columns: repeat(3, auto);
+    justify-content: start;
+    column-gap: 1.25rem;
+    margin: 0;
+  }
+  #contact .rf-summary-list dt {
+    color: var(--color-ink-muted);
+    font-size: 0.6875rem;
+    line-height: 1.3;
+  }
+  #contact .rf-summary-list dd {
+    margin: 0.125rem 0 0;
+    color: var(--color-ink);
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.3;
+    white-space: nowrap;
+  }
+  #contact .rf-summary > a {
+    grid-area: change;
+    justify-self: end;
+    font-size: 0.75rem !important;
+  }
+  #contact .rf-summary .u-form-total {
+    grid-area: total;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin: 0 !important;
+    padding-top: 0.625rem;
+    border-top: 1px solid rgb(14 23 54 / 0.08);
+    font-size: 1rem !important;
+    white-space: nowrap;
+  }
+  #contact .rf-summary .rf-total-label {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--color-ink-muted);
+  }
+  #contact .rf-summary .u-form-total[data-empty="true"] {
+    display: none;
+  }
+
+  /* «+ Вопрос или пожелание» — пунктир: необязательное, раскрывается. */
+  #contact .rf-more {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    height: 2.75rem;
+    border: 1.5px dashed var(--color-border-soft);
+    border-radius: 0.875rem;
+    background: transparent;
+    color: var(--color-ink-secondary);
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    font-weight: 700;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      border-color 160ms var(--ease-out),
+      color 160ms var(--ease-out),
+      scale 160ms var(--ease-out);
+  }
+  #contact .rf-more:active {
+    scale: 0.98;
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+  }
+  #contact .rf-form[data-extras="true"] .rf-more {
+    display: none;
+  }
+  #contact .rf-form[data-extras="true"] .rf-wish {
+    animation: rf-extras-in 280ms var(--ease-out) both;
+  }
+  @keyframes rf-extras-in {
+    from {
+      opacity: 0;
+      translate: 0 -0.375rem;
+    }
+  }
+
+  /* Согласие — плотнее, квадрат под палец. */
+  #contact .rf-consent input[type="checkbox"] {
+    width: 1.5rem !important;
+    height: 1.5rem !important;
+    margin: 0 0.125rem 0 0 !important;
+  }
+  #contact .rf-consent label {
+    font-size: 0.8125rem !important;
+    line-height: 1.35 !important;
+  }
+  #contact .rf-consent #consent-note {
+    margin-top: 0.25rem !important;
+    font-size: 0.6875rem !important;
+    line-height: 1.4 !important;
+  }
+
+  #contact .rf-submit {
+    height: 3.25rem !important;
+    font-size: 1.25rem !important;
+  }
+  #contact .rf-status {
+    margin-top: -0.25rem;
+    font-size: 0.75rem !important;
+  }
+  /* Без ошибки строка пустая — забираем и зазор сетки над ней. */
+  #contact .rf-status:empty {
+    margin-top: -0.875rem;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   «Где проходит» ниже 1024 — WhereMobile.tsx
+   ───────────────────────────────────────────────────────────── */
+
+@media (max-width: 1023.98px) {
+  .wm {
+    display: grid;
+    /*
+      minmax(0, 1fr), а не авто-колонка: лента «Адресов» — три карточки в ряд,
+      и авто-колонка растягивалась по их общей ширине, унося блок за края
+      экрана. Колонка по ширине блока, лишнее обрезает окно ленты.
+    */
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.75rem;
+    width: 100%;
+    max-width: 30rem;
+    margin-inline: auto;
+    font-family: var(--font-sans);
+    color: var(--color-ink);
+  }
+  .wm-tabs {
+    max-width: none;
+  }
+
+  /* ── Карта ──────────────────────────────────────────────── */
+
+  .wm-map {
+    position: relative;
+    aspect-ratio: 650 / 450;
+    overflow: hidden;
+    border-radius: 1.5rem;
+    background: #f4efe8;
+    box-shadow: var(--shadow-card-lg);
+  }
+  .wm-map > img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    user-select: none;
+    -webkit-user-drag: none;
+  }
+
+  /* Метка: зона нажатия 44px с центром в точке площадки. */
+  .wm-pin {
+    position: absolute;
+    top: var(--y);
+    left: var(--x);
+    z-index: 1;
+    width: 2.75rem;
+    height: 2.75rem;
+    margin: -1.375rem 0 0 -1.375rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--color-primary);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .wm-pin[data-on="true"] {
+    z-index: 2;
+  }
+
+  /* Неактивная площадка — тёмная точка в белом ободке. */
+  .wm-dot {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0.875rem;
+    height: 0.875rem;
+    margin: -0.4375rem 0 0 -0.4375rem;
+    border-radius: var(--radius-pill);
+    background: var(--color-navy);
+    box-shadow:
+      0 0 0 2px #fff,
+      0 0.125rem 0.375rem rgb(14 23 54 / 0.35);
+    transition:
+      scale 220ms var(--ease-out),
+      opacity 180ms var(--ease-out);
+  }
+  .wm-pin:active .wm-dot {
+    scale: 1.25;
+  }
+
+  /* Активная — красная капля «падает» остриём в точку. */
+  .wm-drop {
+    position: absolute;
+    bottom: 50%;
+    left: 50%;
+    width: 1.875rem;
+    height: 2.4rem;
+    margin-left: -0.9375rem;
+    overflow: visible;
+    filter: drop-shadow(0 0.25rem 0.375rem rgb(14 23 54 / 0.3));
+    transform-origin: 50% 100%;
+    scale: 0;
+    opacity: 0;
+    transition:
+      scale 380ms var(--ease-pop),
+      opacity 160ms var(--ease-out);
+  }
+  .wm-pin[data-on="true"] .wm-drop {
+    scale: 1;
+    opacity: 1;
+  }
+  .wm-pin[data-on="true"] .wm-dot {
+    scale: 0.4;
+    opacity: 0;
+  }
+
+  /* Подпись активной площадки — белая плашка у головки метки. */
+  .wm-label {
+    position: absolute;
+    top: calc(50% - 2.2rem);
+    padding: 0.25rem 0.5rem;
+    border-radius: var(--radius-pill);
+    background: var(--color-surface);
+    color: var(--color-ink);
+    box-shadow: 0 0.25rem 0.75rem rgb(14 23 54 / 0.18);
+    font-size: 0.75rem;
+    font-weight: 700;
+    white-space: nowrap;
+    opacity: 0;
+    translate: 0 0.25rem;
+    transition:
+      opacity 200ms var(--ease-out),
+      translate 260ms var(--ease-out);
+    pointer-events: none;
+  }
+  .wm-pin[data-side="right"] .wm-label {
+    left: calc(50% + 1rem);
+  }
+  .wm-pin[data-side="left"] .wm-label {
+    right: calc(50% + 1rem);
+  }
+  .wm-pin[data-on="true"] .wm-label {
+    opacity: 1;
+    translate: 0 0;
+    transition-delay: 120ms;
+  }
+
+  /* ── Карточка ───────────────────────────────────────────── */
+
+  /*
+    Лента из трёх карточек: предыдущая, текущая, следующая (WhereMobile.tsx).
+    Соседи стоят за полем страницы — зазор равен полю, и обрезка по краю
+    экрана их прячет, — а при свайпе въезжают за пальцем с первого движения.
+
+    Окно шире блока на поле с каждой стороны, обрезка только по горизонтали:
+    тени карточек сверху и снизу не срезаются. Высоту окна ведёт скрипт —
+    по текущей карточке, при свайпе перетекая к высоте соседней.
+  */
+  .wm-viewport {
+    min-width: 0;
+    margin-inline: calc(-1 * var(--m-gutter));
+    padding-inline: var(--m-gutter);
+    overflow-x: clip;
+    /* Горизонтальный жест — наш, вертикальный — странице. */
+    touch-action: pan-y;
+  }
+  /*
+    Колонки по 100% ширины ленты, стартовый сдвиг — на одну карточку с
+    зазором. Лента выше окна (по самой высокой карточке) — пустое место под
+    текущей не должно перехватывать нажатия, поэтому нажимаются только
+    сами карточки.
+  */
+  .wm-strip {
+    display: grid;
+    grid-auto-columns: 100%;
+    grid-auto-flow: column;
+    align-items: start;
+    column-gap: var(--m-gutter);
+    pointer-events: none;
+  }
+  .wm-card {
+    padding: 1.125rem 1rem 1rem;
+    border-radius: 1.5rem;
+    background: var(--color-surface);
+    box-shadow: var(--shadow-card-lg);
+    pointer-events: auto;
+  }
+
+  .wm-title {
+    font-family: var(--font-display);
+    font-size: 1.625rem;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+    line-height: 1.1;
+  }
+  .wm-metro {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.375rem;
+    margin-top: 0.375rem;
+    color: var(--color-ink-muted);
+    font-size: 0.8125rem;
+    line-height: 1.35;
+  }
+  .wm-metro svg {
+    flex: none;
+    width: 0.9375rem;
+    height: 0.9375rem;
+    margin-top: 0.0625rem;
+    color: var(--color-primary);
+  }
+
+  .wm-metro > span {
+    display: grid;
+    min-width: 0;
+  }
+  .wm-metro-line {
+    overflow: hidden;
+    color: var(--color-ink-secondary);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .wm-taxi {
+    font-size: 0.75rem;
+    white-space: nowrap;
+  }
+
+  /*
+    Плашки рейтинга из макета разных пропорций (у 8И выше), поэтому высота
+    строки фиксирована: карточка не прыгает при листании площадок.
+  */
+  .wm-rating {
+    display: flex;
+    align-items: center;
+    height: 1.875rem;
+    margin-top: 0.75rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.75rem;
+    background: var(--rating-bg);
+  }
+  .wm-rating img {
+    display: block;
+    width: auto;
+    max-width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: left center;
+  }
+
+  .wm-caption {
+    margin-top: 0.875rem;
+    color: var(--color-ink-muted);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  /*
+    Три зала — ровная сетка из трёх одинаковых плашек: название, под ним
+    площадь. Пилюлями в строку одна площадка укладывалась в ряд, другие —
+    в два, и карточка меняла высоту при листании.
+  */
+  .wm-halls {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.375rem;
+    margin: 0.375rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .wm-halls a {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.0625rem;
+    min-height: 3.25rem;
+    padding: 0.375rem 0.125rem;
+    border-radius: 0.875rem;
+    background: var(--color-surface-alt);
+    color: var(--color-ink);
+    /* Название — всегда одной строкой: на 360 «Санта-Лючия» иначе переносится. */
+    font-size: clamp(0.75rem, 3.35vw, 0.8125rem);
+    font-weight: 700;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    text-align: center;
+    white-space: nowrap;
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color 160ms var(--ease-out), scale 160ms var(--ease-out);
+  }
+  .wm-halls a span {
+    color: var(--color-ink-muted);
+    font-size: 0.6875rem;
+    font-weight: 600;
+  }
+  .wm-halls a:active {
+    scale: 0.96;
+    background: var(--color-blush);
+  }
+
+  .wm-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.5rem;
+    margin-top: 1rem;
+  }
+  /* Главное действие карточки: яркая подложка, бледно-розовый текст. */
+  .wm-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 3rem;
+    border-radius: var(--radius-pill);
+    background: var(--color-primary);
+    color: var(--color-blush);
+    font-size: 0.9375rem;
+    font-weight: 700;
+    -webkit-tap-highlight-color: transparent;
+    transition:
+      transform 160ms cubic-bezier(0.23, 1, 0.32, 1),
+      background-color 160ms var(--ease-out);
+  }
+  .wm-primary:active {
+    transform: scale(0.97);
+    background: #c73544;
+  }
+  .wm-route {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    height: 3rem;
+    padding: 0 1rem;
+    border: 1px solid var(--color-border-soft);
+    border-radius: var(--radius-pill);
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font-size: 0.875rem;
+    font-weight: 700;
+    -webkit-tap-highlight-color: transparent;
+    transition: scale 160ms var(--ease-out), border-color 160ms var(--ease-out);
+  }
+  .wm-route svg {
+    width: 0.625rem;
+  }
+  .wm-route:active {
+    scale: 0.96;
+    border-color: var(--color-primary);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Подвал ниже 1024 — FooterMobile.tsx
+
+   Всё по центру: бренд, связь, свёрнутые разделы, документы. Десктопные
+   элементы подвала по координатам макета здесь скрыты.
+   ───────────────────────────────────────────────────────────── */
+
+@media (max-width: 1023.98px) {
+  footer[data-node-id="914:2089"] > :not(.fm) {
+    display: none !important;
+  }
+  footer[data-node-id="914:2089"] {
+    display: block !important;
+    padding: 0 !important;
+    border-radius: 1.75rem;
+    background: rgb(255 255 255 / 0.55) !important;
+  }
+
+  .fm {
+    display: grid;
+    gap: 1.5rem;
+    padding: 1.75rem 1rem 1.25rem;
+    font-family: var(--font-sans);
+    color: var(--color-ink);
+    text-align: center;
+  }
+
+  /* ── Бренд ──────────────────────────────────────────────── */
+
+  .fm-brand {
+    display: grid;
+    justify-items: center;
+    gap: 0.5rem;
+  }
+  .fm-brand img {
+    width: 8.5rem;
+    height: auto;
+  }
+  .fm-brand p {
+    max-width: 14rem;
+    color: var(--color-ink-secondary);
+    font-size: 0.875rem;
+    line-height: 1.4;
+  }
+
+  /* ── Связь ──────────────────────────────────────────────── */
+
+  .fm-contact {
+    display: grid;
+    justify-items: center;
+    gap: 0.75rem;
+  }
+  .fm-phone {
+    color: var(--color-ink);
+    font-family: var(--font-display);
+    font-size: 1.875rem;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+    line-height: 1;
+  }
+  .fm-socials {
+    display: flex;
+    gap: 0.75rem;
+  }
+  .fm-social {
+    display: grid;
+    width: 3rem;
+    height: 3rem;
+    place-items: center;
+    border-radius: var(--radius-pill);
+    background: var(--color-surface);
+    color: var(--color-navy);
+    box-shadow: 0 0.375rem 1rem rgb(67 38 50 / 0.1);
+    -webkit-tap-highlight-color: transparent;
+    transition: scale 160ms var(--ease-out);
+  }
+  .fm-social img,
+  .fm-social svg {
+    width: 1.375rem;
+    height: 1.375rem;
+  }
+  .fm-social:active {
+    scale: 0.92;
+  }
+  .fm-email {
+    color: var(--color-ink-secondary);
+    font-size: 0.875rem;
+  }
+
+  /* ── Разделы ────────────────────────────────────────────── */
+
+  .fm-nav {
+    display: grid;
+    border-top: 1px solid rgb(14 23 54 / 0.08);
+  }
+  .fm-group {
+    border-bottom: 1px solid rgb(14 23 54 / 0.08);
+  }
+  .fm-group summary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    min-height: 3.25rem;
+    color: var(--color-ink);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    list-style: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .fm-group summary::-webkit-details-marker {
+    display: none;
+  }
+  .fm-chevron {
+    width: 1rem;
+    height: 1rem;
+    color: var(--color-primary);
+    transition: rotate 240ms var(--ease-out);
+  }
+  .fm-group[open] .fm-chevron {
+    rotate: 180deg;
+  }
+  .fm-group[open] > :not(summary) {
+    animation: fm-open 260ms var(--ease-out) both;
+  }
+  @keyframes fm-open {
+    from {
+      opacity: 0;
+      translate: 0 -0.375rem;
+    }
+  }
+
+  .fm-links {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.25rem 0.5rem;
+    margin: 0;
+    padding: 0 0 1rem;
+    list-style: none;
+  }
+  .fm-links a,
+  .fm-place a {
+    display: block;
+    padding: 0.5rem 0.25rem;
+    border-radius: 0.75rem;
+    color: var(--color-ink);
+    font-size: 0.9375rem;
+  }
+  .fm-links a:active,
+  .fm-place a:active {
+    background: var(--color-surface-alt);
+    color: var(--color-primary);
+  }
+
+  .fm-halls {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.5rem;
+    padding-bottom: 1rem;
+  }
+  .fm-place p {
+    margin-bottom: 0.125rem;
+    color: var(--color-primary);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+  .fm-place ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .fm-place a {
+    padding: 0.375rem 0;
+    font-size: 0.875rem;
+  }
+
+  .fm-addresses {
+    display: grid;
+    gap: 0.375rem;
+    margin: 0;
+    padding: 0 0 1rem;
+    list-style: none;
+  }
+  .fm-addresses a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.625rem 0.875rem;
+    border-radius: 1rem;
+    background: var(--color-surface);
+    text-align: left;
+  }
+  .fm-addresses span {
+    display: grid;
+  }
+  .fm-addresses b {
+    color: var(--color-ink);
+    font-size: 0.9375rem;
+    font-weight: 700;
+  }
+  .fm-addresses small {
+    color: var(--color-ink-muted);
+    font-size: 0.75rem;
+  }
+  .fm-addresses svg {
+    flex: none;
+    width: 0.75rem;
+    color: var(--color-primary);
+  }
+
+  /* ── Низ ────────────────────────────────────────────────── */
+
+  .fm-bottom {
+    display: grid;
+    gap: 0.5rem;
+  }
+  /*
+    Без точек-разделителей: при переносе на вторую строку точка оставалась
+    висеть в её начале. Ровный зазор читается так же и переносится чисто.
+  */
+  .fm-legal {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.125rem 1.125rem;
+  }
+  .fm-legal button {
+    padding: 0.25rem 0;
+    border: 0;
+    background: none;
+    color: var(--color-ink-muted);
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
+  .fm-city {
+    color: var(--color-ink-muted);
+    font-size: 0.75rem;
+  }
+}
+
+/*
+  «Вернуться к расчёту» — плавающая кнопка, пока человек выбирает зал,
+  придя из итога расчёта (HallsMobile).
+
+  Круг со стрелкой в правом нижнем углу, а не пилюля с текстом по центру:
+  по центру она ложилась на «ВСЕ ЗАЛЫ» и спорила с ней. Угол — привычное
+  место плавающей кнопки, контент блока там не нужен. Выезжает справа,
+  когда блок залов на экране; мягкий пульс-кольцо подсказывает, что это
+  действие, а не украшение. Текст — в aria-label.
+*/
+.hm-return {
+  position: fixed;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: max(1rem, calc(env(safe-area-inset-bottom) + 0.5rem));
+  z-index: 90;
+  display: grid;
+  width: 3.25rem;
+  height: 3.25rem;
+  place-items: center;
+  padding: 0;
+  border: 2px solid rgb(255 255 255 / 0.9);
+  border-radius: var(--radius-pill);
+  background: var(--color-navy);
+  color: var(--color-surface);
+  box-shadow: 0 0.625rem 1.5rem rgb(14 23 54 / 0.35);
+  translate: 150% 0;
+  /*
+    --lift ставит HallsMobile: подъём над «ВСЕ ЗАЛЫ», когда та проезжает
+    через угол. transform, а не translate — translate занят выездом справа;
+    без перехода, чтобы круг шёл вместе с прокруткой, а не догонял её.
+  */
+  transform: translateY(calc(-1 * var(--lift, 0px)));
+  opacity: 0;
+  pointer-events: none;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    translate 380ms var(--ease-drawer),
+    opacity 220ms var(--ease-out),
+    scale 160ms var(--ease-out);
+}
+.hm-return[data-shown="true"] {
+  translate: 0 0;
+  opacity: 1;
+  pointer-events: auto;
+}
+.hm-return svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+.hm-return::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  box-shadow: 0 0 0 0 rgb(14 23 54 / 0.45);
+  pointer-events: none;
+}
+.hm-return[data-shown="true"]::after {
+  animation: hm-return-pulse 1800ms var(--ease-out) 500ms 3;
+}
+@keyframes hm-return-pulse {
+  from {
+    box-shadow: 0 0 0 0 rgb(14 23 54 / 0.45);
+  }
+  to {
+    box-shadow: 0 0 0 0.875rem rgb(14 23 54 / 0);
+  }
+}
+.hm-return:active {
+  scale: 0.92;
+}
+
+/*
+  Телефонные блоки на десктопе не показываем. :root в селекторе — для веса:
+  при равном весе решал бы порядок в файле, а базовые правила этих блоков
+  разнесены по разным разделам, и скрытие дважды оказывалось раньше них.
+*/
+@media (min-width: 1024px) {
+  :root .halls-mobile,
+  :root .gallery-mix,
+  :root .pk-nav,
+  :root .pk-ribbon,
+  :root .dp-mobile,
+  :root .rf-more,
+  :root .wm,
+  :root .fm {
+    display: none;
+  }
+}
+
+.halls-mobile {
+  display: grid;
+  gap: 0.875rem;
+  width: 100%;
+  /* Табы не должны подпирать хвосты букв второй строки заголовка («д», «р»). */
+  margin-top: 0.5rem;
+}
+
+/* Табы площадок: компактная пилюля, текущий — тёмный. */
+.hm-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.25rem;
+  width: 100%;
+  max-width: 26rem;
+  justify-self: center;
+  padding: 0.25rem;
+  border-radius: var(--radius-pill);
+  background: rgb(255 255 255 / 0.72);
+  box-shadow: inset 0 0 0 1px rgb(14 23 54 / 0.06);
+}
+.hm-tab {
+  min-height: 2.5rem;
+  padding: 0 0.375rem;
+  border-radius: var(--radius-pill);
+  color: var(--color-ink-secondary);
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color 220ms var(--ease-out),
+    color 220ms var(--ease-out),
+    box-shadow 220ms var(--ease-out),
+    scale 160ms var(--ease-out);
+}
+.hm-tab[aria-selected="true"] {
+  background: var(--color-navy);
+  color: var(--color-surface);
+  box-shadow: 0 0.25rem 0.75rem rgb(14 23 54 / 0.2);
+}
+.hm-tab:active {
+  scale: 0.96;
+}
+.hm-tab:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* Подзаголовок — общий u-lede секций, в две строки по центру. */
+.hm-lede {
+  justify-self: center;
+  max-width: 21rem;
+  margin-top: -0.25rem;
+}
+
+/*
+  Лента во всю ширину экрана (выходит за поля секции). Дом уже экрана на
+  3rem с каждой стороны: в этих полях выглядывают соседние дома — это и
+  есть подсказка, что дома листаются. При 2.25rem соседа, уменьшенного до
+  0.94, было видно полоской в пару пикселей. Позиция слайда p — ровно
+  p ширин слайда (поля симметричны, дом по центру), так её и считает
+  HallsMobile.
+
+  Примагничивание обязательное и с остановкой на каждом доме: один сильный
+  свайп не должен пролетать через дом.
+*/
+.hm-track {
+  display: flex;
+  /*
+    Снизу — место под тень домов: лента с прокруткой обрезает всё за своим
+    краем, и тень срезалась ровной полосой через весь экран. Отрицательный
+    отступ возвращает раскладку ниже на прежнее место.
+  */
+  margin: 0 calc(-1 * var(--m-gutter, 1rem)) -2.75rem;
+  padding: 0 3rem 2.75rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+}
+.hm-track::-webkit-scrollbar {
+  display: none;
+}
+.hm-slide {
+  display: grid;
+  flex: 0 0 100%;
+  place-items: center;
+  padding-inline: 0.375rem;
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+}
+
+/* Соседний дом, пока заезжает, чуть меньше и прозрачнее — видно, что он следующий. */
+.hm-house {
+  position: relative;
+  width: min(100%, 24rem);
+  transition:
+    opacity 320ms var(--ease-out),
+    scale 320ms var(--ease-out);
+}
+.hm-slide[data-current="false"] .hm-house {
+  opacity: 0.45;
+  scale: 0.94;
+}
+.hm-house img {
+  display: block;
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 1rem 1.25rem rgb(67 38 50 / 0.16));
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* Этаж — только зона нажатия по контуру проёма; видимое рисует рамка. */
+.hm-floor {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 140ms var(--ease-out);
+}
+.hm-floor:active {
+  background: rgb(255 255 255 / 0.16);
+}
+.hm-floor:focus-visible {
+  outline: none;
+  background: rgb(14 23 54 / 0.14);
+}
+
+/*
+  Рамка: красная обводка с мягким свечением и лёгкой заливкой. Свечение —
+  фильтром на всём слое: у невидимых контуров обводки нет, светится только
+  выбранный.
+
+  Прорисовки по контуру (pathLength + stroke-dasharray) здесь нет намеренно:
+  с vector-effect: non-scaling-stroke и растянутым viewBox штрих считается в
+  экранных пикселях, и контур закрывался обрывками. Толщина важнее эффекта —
+  поэтому рамка проявляется целиком.
+*/
+.hm-outline {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 0 0.375rem rgb(219 64 79 / 0.7));
+  pointer-events: none;
+}
+.hm-outline polygon {
+  fill: rgb(219 64 79 / 0);
+  stroke: var(--color-primary);
+  stroke-width: 3;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  opacity: 0;
+  transition:
+    fill 260ms var(--ease-out),
+    opacity 220ms var(--ease-out);
+}
+.hm-outline polygon[data-on="true"] {
+  fill: rgb(219 64 79 / 0.12);
+  opacity: 1;
+}
+
+/* Галочка выбранного зала — впечатывается тем же «штампом», что у шагов. */
+.hm-check {
+  position: absolute;
+  display: grid;
+  width: 1.875rem;
+  height: 1.875rem;
+  margin: 0 0 0 -0.9375rem;
+  place-items: center;
+  border: 2px solid var(--color-surface);
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  color: var(--color-surface);
+  box-shadow: 0 0.25rem 0.625rem rgb(219 64 79 / 0.45);
+  pointer-events: none;
+  animation: u-step-stamp 460ms var(--ease-pop) both;
+}
+.hm-check svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* Индикатор ● ○ ○ */
+.hm-dots {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+}
+.hm-dots span {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: var(--radius-pill);
+  box-shadow: inset 0 0 0 1.5px rgb(14 23 54 / 0.32);
+  transition:
+    background-color 240ms var(--ease-out),
+    box-shadow 240ms var(--ease-out),
+    scale 240ms var(--ease-pop);
+}
+.hm-dots span[data-on="true"] {
+  background: var(--color-primary);
+  box-shadow: none;
+  scale: 1.15;
+}
+
+/* ── Карточка зала: всплывает после нажатия по этажу ─────────────
+
+   Закрытая не занимает места: высота — строка грида 0fr → 1fr, так что
+   её не нужно знать заранее. Сама карточка всплывает с лёгким перелётом,
+   как пузыри кнопок первого экрана.
+
+   align-self: start обязателен: по умолчанию ячейка грида секции
+   растягивается на свою строку, и закрытая карточка получала высоту. Зазор
+   грида вокруг закрытой карточки остаётся, поэтому у кнопки ниже отступ
+   на этот зазор меньше, пока карточка закрыта (см. .hm-all-wrap).
+*/
+.hm-pop {
+  display: grid;
+  grid-template-rows: 0fr;
+  align-self: start;
+  width: 100%;
+  max-width: 26rem;
+  justify-self: center;
+  transition: grid-template-rows 340ms var(--ease-out);
+}
+.hm-pop[data-open="true"] {
+  grid-template-rows: 1fr;
+}
+/*
+  Обрезка для раскрытия. Запаса полей под тень здесь нет намеренно: в
+  свёрнутой строке грида поля не схлопываются, и закрытая карточка
+  оставляла под точками пустые 14px. Вместо этого открытой карточке можно
+  выходить за край — тень не режется, а пока строка растёт, карточка всё
+  равно проявляется из прозрачности. При сворачивании обрезка возвращается
+  сразу, и карточка уходит внутрь.
+*/
+.hm-pop-clip {
+  min-height: 0;
+  overflow: hidden;
+}
+.hm-pop[data-open="true"] .hm-pop-clip {
+  overflow: visible;
+}
+
+.hm-pop-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0.75rem 0.75rem 1.125rem;
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card-lg);
+  opacity: 0;
+  translate: 0 0.75rem;
+  scale: 0.96;
+  transition:
+    opacity 200ms var(--ease-out),
+    translate 260ms var(--ease-out),
+    scale 260ms var(--ease-out);
+}
+.hm-pop[data-open="true"] .hm-pop-card {
+  opacity: 1;
+  translate: 0 0;
+  scale: 1;
+  animation: hm-pop-in 420ms var(--ease-pop) both;
+}
+@keyframes hm-pop-in {
+  from {
+    opacity: 0;
+    translate: 0 0.75rem;
+    scale: 0.94;
+  }
+}
+
+.hm-pop-text {
+  flex: 1;
+  min-width: 0;
+}
+.hm-pop-title {
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  line-height: 1.05;
+  text-transform: uppercase;
+}
+.hm-pop-meta {
+  margin-top: 0.2rem;
+  color: var(--color-ink-muted);
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  line-height: 1.35;
+}
+
+.hm-pick {
+  flex: none;
+  gap: 0.375rem;
+  height: 2.875rem;
+  padding-inline: 1rem;
+  font-size: 1.1875rem;
+  white-space: nowrap;
+  box-shadow: 0 0.375rem 1rem rgb(219 64 79 / 0.28);
+  transition:
+    transform 160ms cubic-bezier(0.23, 1, 0.32, 1),
+    background-color 200ms var(--ease-out),
+    color 200ms var(--ease-out);
+}
+.hm-pick:active {
+  transform: scale(0.97);
+}
+.hm-pick svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+.hm-pick[data-picked="true"] {
+  background: var(--color-navy);
+  color: var(--color-surface);
+  box-shadow: 0 0.375rem 1rem rgb(14 23 54 / 0.24);
+}
+
+/* ── «ВСЕ ЗАЛЫ» с веером ─────────────────────────────────────────
+
+   Тот же приём, что у кнопки на десктопе (.halls-fan в globals.css):
+   девять карточек из-под пилюли расходятся поворотом вокруг точки ниже
+   себя, как карты в руке, от середины к краям. Двигаются только rotate,
+   translate, scale и opacity. Открывает веер не наведение, а появление
+   кнопки в кадре (data-open ставит HallsMobile).
+*/
+/*
+  Отступ над кнопкой — обычный: веер раскрывается ненадолго и на это время
+  ложится поверх точек, держать под него пустое место незачем.
+*/
+.hm-all-wrap {
+  position: relative;
+  justify-self: center;
+  width: min(100%, 18rem);
+  margin-top: 1.25rem;
+  transition: margin-top 340ms var(--ease-out);
+}
+/* Карточка закрыта — вокруг неё два зазора грида вместо одного: вычитаем лишний. */
+.hm-pop[data-open="false"] + .hm-all-wrap {
+  margin-top: 0.375rem;
+}
+.hm-all {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 3.25rem;
+  font-size: 1.375rem;
+  letter-spacing: 0.03em;
+  transition:
+    transform 160ms cubic-bezier(0.23, 1, 0.32, 1),
+    background-color 200ms var(--ease-out),
+    color 200ms var(--ease-out);
+}
+.hm-all:active {
+  transform: scale(0.97);
+  background-color: var(--color-navy);
+}
+/*
+  Точка веера — выше середины пилюли: пилюля на телефоне выше десктопной, и
+  при середине нижние углы крайних, повёрнутых карточек выглядывали из-под
+  её нижнего края белыми уголками.
+*/
+.hm-fan {
+  position: absolute;
+  bottom: 2.25rem;
+  left: 50%;
+  z-index: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.hm-fan img {
+  position: absolute;
+  bottom: 0;
+  left: -1.875rem;
+  width: 3.75rem;
+  max-width: none;
+  aspect-ratio: 5 / 7;
+  border: 2px solid var(--color-surface);
+  border-radius: 0.5rem;
+  object-fit: cover;
+  box-shadow: 0 0.5rem 1rem rgb(28 17 23 / 0.24);
+  transform-origin: 50% 230%;
+  --mid: max(calc(var(--i) - 4), calc(4 - var(--i)));
+  z-index: calc(9 - var(--mid));
+  rotate: 0deg;
+  translate: 0 1.25rem;
+  scale: 0.7;
+  opacity: 0;
+  transition:
+    rotate 560ms var(--ease-pop),
+    translate 560ms var(--ease-pop),
+    scale 380ms var(--ease-out),
+    opacity 260ms var(--ease-out);
+  transition-delay: calc(var(--mid) * 45ms);
+}
+.hm-all-wrap[data-open="true"] .hm-fan img {
+  rotate: calc((var(--i) - 4) * 8.5deg);
+  translate: 0 -0.25rem;
+  scale: 1;
+  opacity: 1;
+}
+
+/* Совсем узкий экран: кнопки друг под другом, текст в них не сжимаем. */
+@media (max-width: 359.98px) {
+  #hero .hero-interface-layer .mt-51 {
+    flex-direction: column;
+  }
+  #hero .hero-pop {
+    flex: none;
+    width: 100%;
+  }
+}
+
+/* ── Кнопки мобильной шапки и меню ───────────────────────────────
+   Вне @media: окно меню живёт в <body>, и стили у него должны быть
+   при любой ширине — например, если окно повернули с открытым меню. */
+
+/* ── «Что дальше?» на телефоне (HowItWorks.tsx → HowMobile) ─────
+   Четыре карточки на прищепках лентой, по две в кадре, с началом и концом:
+   привязка только у 1-й и 3-й карточки — у ленты ровно две страницы.
+   Зазор между карточками равен полю страницы: на первой странице третья
+   карточка не выглядывает из-за края, на второй всё встаёт так же ровно. */
+
+.hw {
+  display: none;
+}
+@media (max-width: 1023.98px) {
+  #how > img,
+  #how > ol.contents {
+    display: none !important;
+  }
+  /*
+    Карточки чуть уже половины экрана: справа выглядывает край третьей —
+    поле страницы + --hw-peek − зазор ≈ 20px, — видно, что лента
+    продолжается. На второй странице так же выглядывает вторая слева.
+  */
+  .hw {
+    --hw-gutter: var(--m-gutter, 1rem);
+    --hw-gap: 0.625rem;
+    --hw-peek: 0.875rem;
+    display: block;
+    width: 100%;
+  }
+  .hw-track {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: calc((100% - var(--hw-gap) - var(--hw-peek)) / 2);
+    gap: var(--hw-gap);
+    margin: 0 calc(-1 * var(--hw-gutter));
+    /* Сверху — место под прищепки: лента обрезает всё, что за её краем. */
+    padding: 4.25rem var(--hw-gutter) 1.25rem;
+    list-style: none;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scroll-padding-inline: var(--hw-gutter);
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+  .hw-track::-webkit-scrollbar {
+    display: none;
+  }
+
+  /*
+    Рамка как у карточек из макета: толстый объёмный кант (градиент по
+    border-box) и светлое поле внутри с лёгкой внутренней тенью.
+  */
+  .hw-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    padding: 1.625rem 0.75rem 0.875rem;
+    border: 0.5rem solid transparent;
+    border-radius: 1.25rem;
+    background:
+      linear-gradient(180deg, #fcf9f8, #f7f1ef) padding-box,
+      linear-gradient(160deg, #e8cdcc 0%, #d3b2b1 55%, #c29f9e 100%) border-box;
+    box-shadow:
+      0 0.75rem 1.25rem -0.875rem rgb(110 50 50 / 0.5),
+      inset 0 0.0625rem 0.25rem rgb(90 40 40 / 0.14);
+  }
+  /* Две точки остановки: начало ленты и её конец. */
+  .hw-card:first-child {
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
+  .hw-card:last-child {
+    scroll-snap-align: end;
+    scroll-snap-stop: always;
+  }
+
+  /*
+    Подсказка «справа есть ещё»: при первом появлении ленты карточки один
+    раз отъезжают влево и мягко возвращаются. Запускает HowMobile — один
+    раз за визит и только если ленту ещё не трогали.
+  */
+  .hw-track[data-nudge] .hw-card {
+    animation: hw-nudge 1150ms cubic-bezier(0.45, 0, 0.25, 1) both;
+  }
+  @keyframes hw-nudge {
+    0% {
+      translate: 0 0;
+    }
+    42% {
+      translate: -3rem 0;
+    }
+    80% {
+      translate: 0.1875rem 0;
+    }
+    100% {
+      translate: 0 0;
+    }
+  }
+  .hw-card[data-active="true"] {
+    background:
+      linear-gradient(180deg, #fde7e7, #fbdcdc) padding-box,
+      linear-gradient(160deg, #ff6d6d 0%, #ee4a4f 50%, #d6363b 100%) border-box;
+    box-shadow:
+      0 0.75rem 1.25rem -0.875rem rgb(200 40 50 / 0.55),
+      inset 0 0.0625rem 0.25rem rgb(130 20 30 / 0.18);
+  }
+
+  /* Прищепка — по центру верхнего канта, как в макете. */
+  .hw-pin {
+    position: absolute;
+    top: -0.5rem;
+    left: 50%;
+    /* Пропорции из подложки: ширина — 0.19 рамки, над кантом — 72% прищепки. */
+    width: calc((100% + 1rem) * 0.19);
+    height: auto;
+    translate: -50% -72%;
+    filter: drop-shadow(0 0.125rem 0.125rem rgb(90 30 30 / 0.28));
+    pointer-events: none;
+  }
+
+  .hw-num {
+    color: var(--color-primary);
+    font-family: var(--font-display);
+    font-size: 1.125rem;
+    font-weight: 900;
+    line-height: 1;
+  }
+  .hw-title {
+    margin-top: 0.3125rem;
+    color: var(--color-ink);
+    font-family: var(--font-display);
+    font-size: clamp(1.0625rem, 4.6vw, 1.25rem);
+    font-weight: 900;
+    line-height: 1.05;
+    text-wrap: balance;
+  }
+  .hw-title[data-accent="true"] {
+    color: var(--color-primary);
+  }
+  .hw-text {
+    margin-top: 0.5rem;
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: clamp(0.75rem, 3.25vw, 0.8125rem);
+    font-weight: 600;
+    line-height: 1.4;
+  }
+
+  .hw-checks {
+    display: grid;
+    margin: 0.375rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  .hw .hw-check {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 1.875rem;
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    font-weight: 600;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .hw .hw-check:active {
+    color: var(--color-primary);
+  }
+  .hw-mark {
+    position: relative;
+    flex: none;
+    width: 1.0625rem;
+    height: 1.0625rem;
+  }
+
+  .hw-dots {
+    gap: 0;
+  }
+  .hw-dot {
+    display: grid;
+    place-items: center;
+    width: 1.75rem;
+    height: 2rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+.m-round {
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid rgb(14 23 54 / 0.06);
+  border-radius: var(--radius-pill);
+  background: rgb(255 255 255 / 0.9);
+  color: var(--color-ink);
+  box-shadow: 0 0.375rem 1rem rgb(28 17 23 / 0.14);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  cursor: pointer;
+  transition:
+    scale 160ms var(--ease-out),
+    background-color 160ms var(--ease-out),
+    color 160ms var(--ease-out);
+}
+.m-round svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+.m-round:active {
+  scale: 0.92;
+  background: var(--color-surface);
+  color: var(--color-primary);
+}
+.m-round:focus-visible {
+  outline: 2px solid var(--color-navy);
+  outline-offset: 2px;
+}
+
+.m-menu {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  max-width: none;
+  /*
+    Высота — видимая часть экрана (--app-vh, layout.tsx). Под строку
+    состояния и панель Safari 26 окно всё равно не заходит, как его ни
+    растягивай, — там затемнение даёт слой страницы (globals.css), а панель
+    меню стоит плавающей карточкой с отступами (.m-menu-panel ниже).
+  */
+  height: var(--app-vh, 100dvh);
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink);
+}
+/*
+  Затемнение — свой слой, а не ::backdrop: у ::backdrop нет анимации
+  закрытия, и появлялся он в другой кадр, чем панель. Здесь оба слоя
+  переключает один data-state (MobileHeader.tsx).
+*/
+.m-menu::backdrop {
+  background: transparent;
+}
+/*
+  Слой нужен для нажатия мимо панели. Затемняет не он, а слой страницы
+  (html[data-menu-open] body::after в globals.css): тот виден и под часами,
+  и под панелью Safari.
+*/
+.m-menu-shade {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  opacity: 0;
+  touch-action: none;
+  transition: opacity 220ms ease-out;
+}
+.m-menu[data-state="open"] .m-menu-shade {
+  opacity: 1;
+}
+
+/* Страница под открытым меню не прокручивается (признак ставит MobileHeader). */
+html[data-menu-open] {
+  overflow: hidden;
+}
+
+/*
+  Панель не выезжает через весь экран, а проявляется с коротким сдвигом
+  справа (24px): выезд на всю ширину за 0,3с давал резкий толчок на старте
+  и дрожание в конце. Сдвиг и прозрачность — только transform и opacity на
+  своём слое. Закрытие короче: панель гаснет и чуть уходит вправо.
+*/
+.m-menu-panel {
+  position: relative;
+  opacity: 0;
+  transform: translate3d(1.5rem, 0, 0);
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  transition:
+    opacity 160ms ease-out,
+    transform 200ms cubic-bezier(0.4, 0, 1, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  /*
+    На любом телефоне слева остаётся одинаковая полоса страницы (3rem):
+    раньше на 390 меню занимало весь экран, а на 430 — нет, потому что
+    упиралось в предел 26rem. Полоса показывает, что меню лежит поверх
+    страницы, и закрывает его по нажатию. Скругление — край «листа».
+  */
+  /*
+    Плавающая карточка с отступами и скруглением со всех сторон: сверху и
+    снизу видно ровное затемнение, а не обрезанный край панели у часов и у
+    панели Safari.
+  */
+  width: min(calc(100% - 3.5rem), 24rem);
+  border-radius: 1.5rem;
+  height: calc(100% - 1rem);
+  margin: 0.5rem 0.5rem 0.5rem auto;
+  padding: 0.75rem 1rem 1.25rem;
+  box-shadow: 0 1rem 3rem rgb(14 23 54 / 0.25);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  background: var(--color-page);
+  font-family: var(--font-sans);
+}
+.m-menu[data-state="open"] .m-menu-panel {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+  transition:
+    opacity 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 300ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .m-menu-panel,
+  .m-menu[data-state="open"] .m-menu-panel {
+    transform: none;
+  }
+}
+
+/* Палочки меню — розовые: кнопку меню видно на любом кадре. */
+.m-round-menu {
+  color: var(--color-primary);
+}
+.m-round-menu svg {
+  stroke-width: 2.4;
+}
+
+/*
+  Плавающая шапка (MobileFloatingHeader.tsx): выезжает сверху при прокрутке
+  вверх. Под кнопками — мягкая подложка цвета страницы, растворяющаяся книзу:
+  логотип читается на любом блоке, но полосы-плашки нет.
+*/
+.m-floating {
+  display: none;
+}
+@media (max-width: 1023.98px) {
+  .m-floating {
+    position: relative;
+    z-index: 60;
+    display: block;
+    pointer-events: none;
+  }
+  .m-floating[data-shown="true"] {
+    pointer-events: auto;
+  }
+  /*
+    Три капсулы вместо полосы (почему — MobileFloatingHeader.tsx): сама
+    обёртка не fixed и места не занимает, fixed — каждая капсула отдельно.
+    Все три стоят сразу под строкой состояния и выезжают вместе.
+  */
+  .m-floating .m-header {
+    position: static;
+    display: block;
+    height: 0;
+  }
+  .m-floating .m-header > * {
+    position: fixed;
+    top: calc(env(safe-area-inset-top) + 0.375rem);
+    transform: translate3d(0, calc(-100% - env(safe-area-inset-top) - 1rem), 0);
+    transition: transform 240ms cubic-bezier(0.4, 0, 0.9, 0.6);
+  }
+  .m-floating[data-shown="true"] .m-header > * {
+    transform: translate3d(0, 0, 0);
+    transition: transform 360ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  .m-floating .m-header > :first-child {
+    left: var(--m-gutter);
+  }
+  .m-floating .m-header > :last-child {
+    right: var(--m-gutter);
+  }
+  /* Логотип — та же капсула, что в шапке первого экрана (.m-header-logo выше). */
+  .m-floating .m-header-logo {
+    top: calc(env(safe-area-inset-top) + 0.375rem);
+    left: 50%;
+  }
+}
+
+.m-menu-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 3.05rem;
+}
+.m-menu-title {
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.m-menu-links {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.m-menu-links a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 3rem;
+  border-bottom: 1px solid rgb(14 23 54 / 0.08);
+  color: var(--color-ink);
+  font-size: 1.0625rem;
+  font-weight: 700;
+  transition: color 160ms var(--ease-out);
+}
+.m-menu-links a::after {
+  content: "→";
+  color: var(--color-primary);
+  font-weight: 600;
+  transition: translate 160ms var(--ease-out);
+}
+.m-menu-links a:active {
+  color: var(--color-primary);
+}
+.m-menu-links a:active::after {
+  translate: 0.25rem 0;
+}
+
+.m-menu-cta {
+  width: 100%;
+  height: 3.25rem;
+  font-size: 1.25rem;
+}
+
+.m-menu-contacts {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: auto;
+}
+.m-menu-phone {
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+.m-menu-msgrs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+.m-menu-msgr {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  height: 2.75rem;
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+.m-menu-msgr img {
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 0.25rem;
+}
+.m-menu-msgr:active {
+  border-color: var(--color-primary);
+}
+.m-menu-note {
+  color: var(--color-ink-muted);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}

@@ -1,6 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+/**
+ * Кончик пламени на картинке Руби (faq/hero.webp, 774×1080) — доли размера.
+ * По нему картинка ставится на телефоне так, чтобы пламя заходило в зазор
+ * между «В» и «о» заголовка.
+ */
+const FLAME = { fx: 0.4186, fy: 0.0065, ratio: 1080 / 774 };
+
+/**
+ * Пропорции шапки на телефоне.
+ *   rubi    — ширина Руби в долях ширины блока (и потолок в px). Середина
+ *             между двумя крайностями: при ~95px Руби терялся, при ~180px
+ *             под заголовком оставалась пустота;
+ *   tip     — где по высоте первой строки стоит кончик пламени (доля буквы);
+ *   minLeft — левее этого картинка не уходит, иначе обрезается ковёр;
+ *   кегль   — в этих пределах, дальше растёт или мельчает уже неуместно.
+ */
+const FIT = { rubi: 0.35, maxRubi: 170, tip: 0.72, minLeft: 4, minFs: 30, maxFs: 64 };
+const NARROW = "(max-width: 1023.98px)";
 import SectionHeading from "./SectionHeading";
 import { box, px } from "@/lib/px";
 
@@ -65,6 +84,140 @@ const GAP = 8.7;
 export default function Faq() {
   const [open, setOpen] = useState(0);
 
+  /*
+    Телефон: шапка — одна композиция. Заголовок справа, Руби под ним слева,
+    и пламя свечи заходит между «В» и «о» первой строки. Где эти буквы,
+    знает только браузер, поэтому меряем их и ставим картинку по кончику
+    пламени; подпись опускаем к низу картинки, список — под картинку.
+    Считаем от раскладки (offsetLeft/offsetTop), а не от экрана: заголовок
+    может въезжать анимацией появления.
+  */
+  useEffect(() => {
+    const section = document.getElementById("faq");
+    const heading = section?.querySelector<HTMLElement>(":scope > h2");
+    const img = section?.querySelector<HTMLImageElement>(":scope > img");
+    const lede = section?.querySelector<HTMLElement>(":scope > p");
+    if (!section || !heading || !img || !lede) return;
+    const media = window.matchMedia(NARROW);
+    const props = [
+      "--rubi-x",
+      "--rubi-y",
+      "--rubi-w",
+      "--faq-fs",
+      "--faq-lede-gap",
+      "--faq-list-gap",
+      "--faq-lede-fs",
+    ];
+
+    /** Первая строка заголовка: диапазон символов [from, to). */
+    const range = (from: number, to?: number) => {
+      const walker = document.createTreeWalker(heading, NodeFilter.SHOW_TEXT, {
+        acceptNode: (n) =>
+          n.textContent?.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP,
+      });
+      const node = walker.nextNode();
+      if (!node?.textContent) return null;
+      const text = node.textContent;
+      const start = text.search(/\S/);
+      const end = start + text.trim().length;
+      const r = document.createRange();
+      r.setStart(node, start + from);
+      r.setEnd(node, to === undefined ? start + from + 1 : Math.min(end, start + to));
+      return r.getBoundingClientRect();
+    };
+
+    let frame = 0;
+
+    const place = () => {
+      if (!media.matches) {
+        props.forEach((p) => section.style.removeProperty(p));
+        return;
+      }
+      const v = range(0);
+      const o = range(1);
+      const line = range(0, Infinity);
+      if (!v || !o || !line) return;
+      const own = heading.getBoundingClientRect();
+      const fs0 = parseFloat(getComputedStyle(heading).fontSize);
+
+      /*
+        Кегль под заданного Руби. Размеры строки пропорциональны кеглю —
+        меряем доли при текущем:
+          ширина первой строки          k·fs (строка прижата к правому краю);
+          середина «В|о» от её начала   c·fs;
+        левый край картинки = зазор − fx·ширина_Руби ≥ minLeft. Берём
+        наибольший кегль, при котором это выполняется.
+      */
+      const k = line.width / fs0;
+      const c = ((v.right + o.left) / 2 - line.left) / fs0;
+      const cs = getComputedStyle(section);
+      const right = section.clientWidth - parseFloat(cs.paddingRight);
+      const rubiW = Math.min(FIT.maxRubi, section.clientWidth * FIT.rubi);
+      const fs = Math.max(
+        FIT.minFs,
+        Math.min(FIT.maxFs, (right - FIT.minLeft - FLAME.fx * rubiW) / (k - c)),
+      );
+      const next = `${fs.toFixed(1)}px`;
+      if (section.style.getPropertyValue("--faq-fs") !== next) {
+        section.style.setProperty("--faq-fs", next);
+        section.style.setProperty("--rubi-w", `${rubiW.toFixed(1)}px`);
+        /* Кегль поменялся — буквы переехали: ставим картинку в следующем кадре. */
+        cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(place);
+        return;
+      }
+
+      const gapX = heading.offsetLeft + ((v.right + o.left) / 2 - own.left);
+      /* 0.72 высоты буквы — пламя видно в зазоре, а не прячется за буквами. */
+      const tipY = heading.offsetTop + (v.top - own.top) + v.height * FIT.tip;
+      const w = img.offsetWidth;
+      const h = w * FLAME.ratio;
+      const x = gapX - FLAME.fx * w;
+      const y = tipY - FLAME.fy * h;
+      section.style.setProperty("--rubi-x", `${x.toFixed(1)}px`);
+      section.style.setProperty("--rubi-y", `${y.toFixed(1)}px`);
+
+      /*
+        Подпись — низом ровно по низу ковра (0.954 высоты картинки): она
+        держит композицию, выравнивая текстовую сторону с картинкой.
+        Список — под картинку.
+      */
+      const headingBottom = heading.offsetTop + heading.offsetHeight;
+      const imgBottom = y + h;
+      const rugBottom = y + h * 0.954;
+      /*
+        На самых узких экранах строка подписи справа от ковра не помещается
+        и наезжает на него — тогда подпись чуть мельче, но не меньше 10px.
+      */
+      section.style.removeProperty("--faq-lede-fs");
+      const room = section.clientWidth - (x + w) - 6;
+      if (lede.offsetWidth > room) {
+        const base = parseFloat(getComputedStyle(lede).fontSize);
+        const fit = Math.max(10, (base * room) / lede.offsetWidth);
+        section.style.setProperty("--faq-lede-fs", `${fit.toFixed(2)}px`);
+      }
+      const ledeGap = Math.max(8, rugBottom - lede.offsetHeight - headingBottom);
+      const ledeBottom = headingBottom + ledeGap + lede.offsetHeight;
+      const listGap = Math.max(16, imgBottom + 16 - ledeBottom);
+      section.style.setProperty("--faq-lede-gap", `${ledeGap.toFixed(1)}px`);
+      section.style.setProperty("--faq-list-gap", `${listGap.toFixed(1)}px`);
+    };
+
+    place();
+    document.fonts?.ready.then(place);
+    const observer = new ResizeObserver(place);
+    observer.observe(heading);
+    observer.observe(img);
+    media.addEventListener("change", place);
+    window.addEventListener("resize", place);
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      media.removeEventListener("change", place);
+      window.removeEventListener("resize", place);
+    };
+  }, []);
+
   return (
     <section id="faq" data-section="faq" style={box(0, 8264, 1440, 698)}>
       <SectionHeading
@@ -109,20 +262,29 @@ export default function Faq() {
         {ITEMS.map((item, i) => {
           const isOpen = open === i;
           return (
+            /*
+              <details> всегда открыт: закрытый элемент браузер прячет сразу,
+              без возможности анимировать высоту. Открыт ли ответ, решает
+              data-open — по нему ответ плавно раскрывается (.u-faq-panel).
+            */
             <details
               key={item.q}
-              open={isOpen}
+              open
               data-node-id={i === 0 ? "914:2024" : undefined}
               className="u-faq group rounded-md"
               data-open={isOpen}
             >
               <summary
+                aria-expanded={isOpen}
                 className="relative flex cursor-pointer list-none"
                 style={{ height: px(ROW_HEIGHT) }}
                 onClick={(e) => {
-                  // открытым управляем сами: закрывать последний нечем
+                  /*
+                    Открытым управляем сами: открыт не больше одного ответа.
+                    Нажатие по открытому закрывает его — можно свернуть все.
+                  */
                   e.preventDefault();
-                  setOpen(i);
+                  setOpen((current) => (current === i ? -1 : i));
                 }}
               >
                 <span
@@ -164,14 +326,16 @@ export default function Faq() {
                       stroke="currentColor"
                       strokeWidth="1.4"
                       strokeLinecap="round"
-                      className="group-open:hidden"
+                      className="u-faq-plus"
                     />
                   </svg>
                 </span>
               </summary>
 
+              <div className="u-faq-panel" inert={!isOpen}>
+              <div className="u-faq-clip">
               <div
-                className="rounded-sm bg-surface-alt"
+                className="u-faq-body rounded-sm bg-surface-alt"
                 style={{
                   marginLeft: px(60),
                   marginRight: px(19),
@@ -210,6 +374,8 @@ export default function Faq() {
                     ))}
                   </ul>
                 ) : null}
+              </div>
+              </div>
               </div>
             </details>
           );

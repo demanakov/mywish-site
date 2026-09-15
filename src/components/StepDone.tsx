@@ -32,6 +32,9 @@ const NEXT: Partial<Record<Step, Step>> = {
   date: "sent",
 };
 
+/** Номер шага — для подписи «Шаг N из 4» на телефоне. */
+const NUMBER: Record<Step, number> = { hall: 1, package: 2, date: 3, sent: 4 };
+
 /** Сколько держим отыгрыш и приглашение. */
 const CELEBRATE = 900;
 const INVITE = 2400;
@@ -57,6 +60,11 @@ export default function StepDone({
 }) {
   const order = useOrder();
   const was = useRef(false);
+  /* Когда компонент ожил: выбор, поднятый из хранилища сразу после загрузки, — не событие. */
+  const born = useRef(0);
+  useEffect(() => {
+    born.current = performance.now();
+  }, []);
 
   const done =
     step === "hall"
@@ -94,6 +102,19 @@ export default function StepDone({
 
     if (!закрыли) return;
 
+    /*
+      Номер шага за экраном — впечатывание галочки никто не увидит. Тогда
+      тот же момент отыгрывает плашка внизу экрана (StepToast). Заявку не
+      дублируем: её подтверждение показывает сама форма.
+    */
+    if (step !== "sent" && performance.now() - born.current > 1500) {
+      const r = section.querySelector<HTMLElement>(".u-step-sticker")?.getBoundingClientRect();
+      const onScreen = r && r.height > 0 && r.bottom > 72 && r.top < window.innerHeight - 24;
+      if (!onScreen) {
+        window.dispatchEvent(new CustomEvent("mywish:step-done", { detail: { step } }));
+      }
+    }
+
     section.dataset.justDone = "";
     const nextStep = NEXT[step];
     const next = nextStep
@@ -113,13 +134,23 @@ export default function StepDone({
   }, [step, done]);
 
   return (
-    <span aria-hidden className="u-step-burst" style={box(...at)}>
-      {SPARKS.map((s) => (
-        <i
-          key={s.i}
-          style={{ "--dx": s.dx, "--dy": s.dy, "--i": s.i } as CSSProperties}
-        />
-      ))}
-    </span>
+    <>
+      <span aria-hidden className="u-step-burst" style={box(...at)}>
+        {SPARKS.map((s) => (
+          <i
+            key={s.i}
+            style={{ "--dx": s.dx, "--dy": s.dy, "--i": s.i } as CSSProperties}
+          />
+        ))}
+      </span>
+      {/*
+        Подпись под номером — только на телефоне (mobile.css). Четыре стикера
+        с подписью «Шаг N из 4» читаются как один путь, а не как случайные
+        наклейки; сделанный шаг подписан «готово».
+      */}
+      <span className="u-step-caption" data-done={done}>
+        {done ? `Шаг ${NUMBER[step]} · готово` : `Шаг ${NUMBER[step]} из 4`}
+      </span>
+    </>
   );
 }

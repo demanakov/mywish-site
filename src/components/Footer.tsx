@@ -1,12 +1,14 @@
 "use client";
+import Link from "next/link";
 
 import { useState } from "react";
 import LegalModal from "./LegalModal";
+import FooterMobile from "./FooterMobile";
 import { LEGAL, LEGAL_ORDER } from "@/lib/legal";
 import type { LegalId } from "@/lib/legal";
 import { box, px } from "@/lib/px";
 import { CONTACTS } from "@/lib/contacts";
-import { HALLS } from "@/lib/halls.mjs";
+import { LOCATIONS, HALLS } from "@/lib/halls.mjs";
 
 /**
  * CTA-баннер (914:2083) и футер (914:2089).
@@ -32,23 +34,7 @@ const SITE_LINKS = [
   расхождение стало бы битой ссылкой, поэтому названия и якоря общие.
 */
 
-const ADDRESSES = [
-  {
-    label: "Кожевенная линия, 34А",
-    y: 47,
-    map: "https://yandex.ru/maps/org/rubin_loft/94381773448/",
-  },
-  {
-    label: "Профессора Качалова, 8И",
-    y: 69,
-    map: "https://yandex.ru/maps/org/rubin_loft/224972655169/",
-  },
-  {
-    label: "Профессора Качалова, 15А",
-    y: 92,
-    map: "https://yandex.ru/maps/org/rubin_loft/100393680164/",
-  },
-];
+const ADDRESSES = LOCATIONS.map((location, index) => ({ label: location.title, map: location.map, y: [47, 69, 92][index] }));
 
 /** Координаты нижней строки из макета; подписи — из самих документов. */
 const LEGAL_X = [26, 77, 182, 232];
@@ -120,9 +106,9 @@ export default function Footer() {
           Залы
         </p>
         {HALLS.map((h, i) => (
-          <a key={h.slug} href={`/halls#${h.slug}`} className={LINK} style={{ ...box(479, 45 + i * 19.3, 150, 14), fontSize: px(9.1) }}>
+          <Link key={h.slug} href={`/halls#${h.slug}`} className={LINK} style={{ ...box(479, 45 + i * 19.3, 150, 14), fontSize: px(9.1) }}>
             {h.title}
-          </a>
+          </Link>
         ))}
 
         {/* Колонка «Адреса» */}
@@ -206,6 +192,9 @@ export default function Footer() {
         <p className="font-sans text-ink-muted" style={{ ...box(1081, 325, 100, 12), fontSize: px(8.3) }}>
           Санкт-Петербург
         </p>
+
+        {/* Ниже 1024 — своя раскладка подвала (mobile.css); окно документов общее. */}
+        <FooterMobile onLegal={setLegal} />
       </footer>
 
       <LegalModal id={legal} onClose={() => setLegal(null)} />

@@ -100,6 +100,7 @@ export default function LegalModal({
                 })}
               </section>
             ))}
+            <p><a href={"/" + id} className="u-legal-link">Открыть отдельной страницей</a></p>
             <p className="u-legal-version">{doc.version}</p>
           </div>
         </article>

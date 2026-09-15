@@ -1,0 +1,25 @@
+name: Site checks
+on:
+  push:
+  pull_request:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+        env:
+          NEXT_PUBLIC_SITE_URL: https://mywish.example
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - name: Browser regression
+        run: |
+          npm start > /tmp/mywish-server.log 2>&1 &
+          node scripts/wait-server.mjs
+          npm run test:e2e
+          TEST_BROWSER=firefox npm run test:e2e
+          TEST_BROWSER=webkit npm run test:e2e

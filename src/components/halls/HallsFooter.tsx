@@ -1,7 +1,9 @@
 "use client";
+import Link from "next/link";
 
 import { useState } from "react";
 import LegalModal from "@/components/LegalModal";
+import FooterMobile from "@/components/FooterMobile";
 import { LEGAL, LEGAL_ORDER } from "@/lib/legal";
 import type { LegalId } from "@/lib/legal";
 import { CONTACTS } from "@/lib/contacts";
@@ -27,9 +29,9 @@ export default function HallsFooter() {
           <p className="u-heading text-d-s">
             Ну что, начинаем <em>праздник?</em>
           </p>
-          <a href="/#contact" className="u-cta-band-btn halls-cta-btn">
+          <Link href="/#contact" className="u-cta-band-btn halls-cta-btn">
             ОСТАВИТЬ ЗАЯВКУ
-          </a>
+          </Link>
         </div>
 
         <div className="halls-footer-cols">
@@ -74,18 +76,18 @@ export default function HallsFooter() {
 
           <div>
             <p className="halls-footer-head">Сайт</p>
-            <a href="/" className="halls-footer-link">
+            <Link href="/" className="halls-footer-link">
               На главную
-            </a>
-            <a href="/#packages" className="halls-footer-link">
+            </Link>
+            <Link href="/#packages" className="halls-footer-link">
               Пакеты
-            </a>
-            <a href="/#price" className="halls-footer-link">
+            </Link>
+            <Link href="/#price" className="halls-footer-link">
               Калькулятор праздника
-            </a>
-            <a href="/#faq" className="halls-footer-link">
+            </Link>
+            <Link href="/#faq" className="halls-footer-link">
               Вопросы
-            </a>
+            </Link>
           </div>
 
           <div>
@@ -101,6 +103,11 @@ export default function HallsFooter() {
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Ниже 1024 — тот же подвал, что на главной (halls.css прячет колонки выше). */}
+        <div className="halls-footer-mobile">
+          <FooterMobile onLegal={setLegal} />
         </div>
       </div>
 

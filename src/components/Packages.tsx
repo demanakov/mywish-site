@@ -3,9 +3,10 @@ import PickPackage from "./PickPackage";
 import FoodMenuModal, { type FoodSetItem } from "./FoodMenuModal";
 import PackagesChoice from "./PackagesChoice";
 import PackagesLede from "./PackagesLede";
+import PackagesCarousel from "./PackagesCarousel";
 import StepDone from "./StepDone";
 import { box, px } from "@/lib/px";
-import type { PackageId } from "@/lib/pricing";
+import { getPackage, money, type PackageId } from "@/lib/pricing";
 
 /**
  * Секция 6 «выбери пакет» — Figma 914:1239 … 914:1310.
@@ -38,8 +39,14 @@ const THEMES: Record<PackageId, Theme> = {
     rule: "#000000",
   },
   extra: {
+    /*
+      Фирменный красный, как в макете, у пилюли «Экстра» и у банта. Тёмный
+      #ba2e43 на его месте рядом с ними читался как другой оттенок — будто
+      на карточке градиент. Текст белый, а не розовый из макета: мелкие
+      строки на красном так читаются лучше.
+    */
     bg: "var(--color-primary)",
-    text: "var(--color-blush)",
+    text: "var(--color-surface)",
     badgeBg: "var(--color-blush)",
     badgeText: "var(--color-primary)",
     badgeBgHover: "var(--color-navy)",
@@ -101,7 +108,13 @@ type Card = {
   bullets: string[];
   food: { deposit: string; tableImage: string; items: FoodSetItem[] };
   extras: string[];
-  img: { file: string; x: number; y: number; w: number; h: number };
+  img: {
+    file: string;
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+  };
 };
 
 const CARDS: Card[] = [
@@ -111,13 +124,13 @@ const CARDS: Card[] = [
     theme: "happy",
     name: "«Хэппи»",
     nameX: 110,
-    price: "19 700₽",
+    price: money(getPackage("happy").price),
     priceX: 110,
     lede: "База, в которой есть всё нужное для хорошего праздника.",
     bullets: ["• 2 микрофона", "• Сервировка стандарт"],
     food: {
       deposit: "13 100 ₽",
-      tableImage: "/packages/food/happy/table.png",
+      tableImage: "/packages/food/happy/table.webp",
       items: [
         { name: "Бокс ассорти салатов", price: "3 900 ₽", image: "/packages/food/happy/salad-box.png" },
         { name: "Бокс круассанов ассорти", price: "4 800 ₽", image: "/packages/food/happy/croissants.png" },
@@ -133,13 +146,13 @@ const CARDS: Card[] = [
     theme: "extra",
     name: "«Экстра»",
     nameX: 104,
-    price: "32 500₽",
+    price: money(getPackage("extra").price),
     priceX: 109,
     lede: "Всё нужное и чуть больше — чтобы совсем ни о чём не думать.",
     bullets: ["• 4 микрофона", "• Сервировка полная"],
     food: {
       deposit: "17 400 ₽",
-      tableImage: "/packages/food/extra/table.png",
+      tableImage: "/packages/food/extra/table.webp",
       items: [
         { name: "Фруктовый микс", price: "4 400 ₽", image: "/packages/food/extra/fruit-mix.png" },
         { name: "Королева брускетт вечеринок", price: "4 800 ₽", image: "/packages/food/extra/bruschetta.png" },
@@ -156,13 +169,13 @@ const CARDS: Card[] = [
     theme: "wow",
     name: "«Вау»",
     nameX: 126,
-    price: "100 500₽",
+    price: money(getPackage("wow").price),
     priceX: 103,
     lede: "Максимум — когда хочется, чтобы запомнилось всем.",
     bullets: ["• 4 микрофона", "• Сервировка премиум"],
     food: {
       deposit: "26 600 ₽",
-      tableImage: "/packages/food/wow/table.png",
+      tableImage: "/packages/food/wow/table.webp",
       items: [
         { name: "Фруктовый микс", price: "4 400 ₽", image: "/packages/food/wow/fruit-mix.png" },
         { name: "Ассорти сыров", price: "5 000 ₽", image: "/packages/food/wow/cheese.png" },
@@ -177,11 +190,26 @@ const CARDS: Card[] = [
       "+Официант 5ч",
       "+Welcome фото-зона",
       "+Фотограф 2ч",
-      "+Шоу-программа (Ведущий 2ч + диджей 3ч)",
+      "+Шоу-программа (Ведущий 2ч + DJ 3ч)",
     ],
     img: { file: "p3", x: 104, y: 435, w: 118, h: 152 },
   },
 ];
+
+/**
+ * Пункт состава с маркером из макета («• », «+») отдельным span: на десктопе
+ * текст выглядит как прежде, а на телефоне маркер заменяет значок (mobile.css).
+ */
+function Marked({ text }: { text: string }) {
+  const match = /^([•+]\s?)(.*)$/.exec(text);
+  if (!match) return <>{text}</>;
+  return (
+    <>
+      <span className="u-package-mark">{match[1]}</span>
+      {match[2]}
+    </>
+  );
+}
 
 export default function Packages() {
   return (
@@ -240,6 +268,16 @@ export default function Packages() {
       */}
       <PackagesChoice />
 
+      {/*
+        Ниже 1024 — лента по одной карточке, как выбор зала (PackagesCarousel);
+        на десктопе обёртка прозрачна, карточки стоят на координатах макета.
+      */}
+      <PackagesCarousel
+        labels={CARDS.map((c) => c.name.replace(/[«»]/g, ""))}
+        themes={CARDS.map((c) => c.theme)}
+        ribbon={CARDS.findIndex((c) => c.theme === "extra")}
+        initial={CARDS.findIndex((c) => c.theme === "extra")}
+      >
       {CARDS.map((c) => {
         const t = THEMES[c.theme];
         return (
@@ -254,14 +292,20 @@ export default function Packages() {
               color: t.text,
             }}
           >
+            {/*
+              Название и цена. На десктопе обёртка прозрачна — оба стоят на
+              координатах макета; на телефоне это одна строка: название слева,
+              цена справа (mobile.css), — карточка ниже на строку.
+            */}
+            <div className="u-package-head contents">
             <h3
-              className="font-sans font-bold"
+              className="u-package-name font-sans font-bold"
               style={{ ...box(c.nameX, 14, undefined, 34), fontSize: px(25) }}
             >
               {c.name}
             </h3>
             <p
-              className="font-sans font-extrabold"
+              className="u-package-price font-sans font-extrabold"
               style={{
                 ...box(c.priceX, 48, undefined, 35),
                 fontSize: px(25.4),
@@ -269,10 +313,12 @@ export default function Packages() {
             >
               {c.price}
             </p>
+            </div>
 
             {/* Line 1 — разделитель под ценой */}
             <span
               aria-hidden
+              className="u-package-rule"
               style={{
                 ...box(27, 83, 270, 0),
                 borderTop: `${px(0.7)} solid ${t.rule}`,
@@ -280,7 +326,7 @@ export default function Packages() {
             />
 
             <p
-              className="font-sans font-medium"
+              className="u-package-lede font-sans font-medium"
               style={{ ...box(26, 91, 273, 53), fontSize: px(15) }}
             >
               {c.lede}
@@ -292,6 +338,13 @@ export default function Packages() {
               высоту, но тянется ровно по тексту и отзывается на наведение
               вместе с ним. Линии 914-го макета (135 и 39) им и заменены.
             */}
+            {/*
+              Состав — три группы: общее для всех пакетов, еда и сервировка,
+              добавки пакета. На десктопе группы прозрачны (display: contents),
+              пункты стоят на координатах макета; на телефоне это плашки.
+              Общее для всех пакетов (u-package-base) на телефоне — чипами.
+            */}
+            <div className="u-package-group u-package-base contents">
             {BASE.map((item, i) =>
               item.href ? (
                 <a
@@ -321,7 +374,9 @@ export default function Packages() {
                 </p>
               ),
             )}
+            </div>
 
+            <div className="u-package-group u-package-own contents">
             <span style={box(32, 265, 261, 22)}>
               <FoodMenuModal
                 packageName={c.name}
@@ -340,11 +395,18 @@ export default function Packages() {
                   fontSize: px(15),
                 }}
               >
-                {item}
+                <Marked text={item} />
               </p>
             ))}
+            </div>
 
-            {c.extras.map((item, i) => (
+            {/*
+              Добавки. Группа есть у всех карточек: на телефоне у «Хэппи» на её
+              месте строка «Без дополнительных опций» — блоки стоят одинаково и
+              пакеты сравниваются построчно. На десктопе строка скрыта.
+            */}
+            <div className="u-package-group u-package-extras contents">
+            {c.extras.length ? c.extras.map((item, i) => (
               <p
                 key={item}
                 className="font-sans font-medium"
@@ -353,10 +415,20 @@ export default function Packages() {
                   fontSize: px(15),
                 }}
               >
-                {item}
+                <Marked text={item} />
               </p>
-            ))}
+            )) : (
+              <p className="u-package-empty font-sans font-medium">
+                Без дополнительных опций
+              </p>
+            )}
+            </div>
 
+            {/*
+              Подвал карточки: Руби и кнопка. На телефоне Руби скрыт, а подвал
+              прижимает кнопку к низу карточки (mobile.css).
+            */}
+            <div className="u-package-foot contents">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={`/figma/packages/${c.img.file}.webp`}
@@ -386,9 +458,11 @@ export default function Packages() {
                 } as React.CSSProperties
               }
             />
+            </div>
           </article>
         );
       })}
+      </PackagesCarousel>
 
       {/*
         Бант «наш выбор» 914:1310 — идёт после карточек, потому что в макете

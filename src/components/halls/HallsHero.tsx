@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useBackgroundVideo } from "@/lib/useBackgroundVideo";
+import { enableHeroRunway } from "@/lib/heroRunway";
 import SiteHeader from "@/components/SiteHeader";
 
 /**
@@ -20,33 +22,10 @@ import SiteHeader from "@/components/SiteHeader";
 export default function HallsHero() {
   const ref = useRef<HTMLVideoElement>(null);
 
-  useEffect(() => {
-    const video = ref.current;
-    if (!video) return;
-    video.muted = true;
-
-    let pending = false;
-    const resume = () => {
-      if (pending || !video.paused) return;
-      pending = true;
-      video
-        .play()
-        .catch(() => {})
-        .finally(() => {
-          pending = false;
-        });
-    };
-    resume();
-
-    document.addEventListener("visibilitychange", resume);
-    window.addEventListener("focus", resume);
-    window.addEventListener("pointerdown", resume);
-    return () => {
-      document.removeEventListener("visibilitychange", resume);
-      window.removeEventListener("focus", resume);
-      window.removeEventListener("pointerdown", resume);
-    };
-  }, []);
+  /* Кнопки паузы нет по просьбе заказчика: ролик играет всегда. */
+  useBackgroundVideo(ref, true);
+  /* iPhone: верх кадра — под часами, как на главной, см. lib/heroRunway.ts. */
+  useEffect(() => enableHeroRunway(), []);
 
   return (
     <section className="halls-hero" data-page-hero>
@@ -54,13 +33,13 @@ export default function HallsHero() {
         ref={ref}
         className="halls-hero-video"
         poster="/video/halls/promo.webp"
-        preload="auto"
-        autoPlay
+        preload="none"
         muted
         loop
         playsInline
         aria-hidden
       >
+        <source src="/video/halls/promo-mobile.mp4" type="video/mp4" media="(max-width: 1023px)" />
         <source src="/video/halls/promo.webm" type="video/webm" />
         <source src="/video/halls/promo.mp4" type="video/mp4" />
       </video>

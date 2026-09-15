@@ -1,6 +1,4 @@
 @import "tailwindcss";
-/* Страница залов — отдельным файлом: она большая и к главной отношения не имеет. */
-@import "./halls.css";
 
 /* ─────────────────────────────────────────────────────────────
    MyWish — дизайн-система
@@ -122,6 +120,20 @@ body {
 }
 
 /*
+  Только в разработке (признак ставит layout.tsx). Когда во встроенном
+  браузере включён размер телефона, поле вокруг эмулируемого экрана браузер
+  заливает фоном холста — а холст берёт фон у body, если у html своего нет.
+  Розовое на розовом: границ телефона не видно. Своим фоном у html холст
+  становится тёмным, а розовый остаётся на самом body. В сборку не попадает.
+*/
+html[data-dev-frame] {
+  background: #2b2d33;
+}
+html[data-dev-frame] body {
+  min-height: 100svh;
+}
+
+/*
   От 1024 страница по ширине точно помещается, поэтому обрезаем
   горизонтальное переполнение: это позволяет тянуть художественные подложки
   во всю ширину окна (100vw шире клиентской области на ширину полосы
@@ -152,6 +164,12 @@ body {
   108 макетных px высотой, плюс воздух.
 */
 html {
+  /*
+    Явный фон корня — цвет страницы. Safari 26 на iPhone, пока страница не
+    прокручена, заливает зону часов фоном корня; без своего фона он брал бы
+    белый, и над первым экраном стояла бы светлая полоса.
+  */
+  background-color: var(--color-blush);
   scroll-behavior: smooth;
   /*
     Подмагничивание ключевых блоков. proximity, а не mandatory: обязательное
@@ -325,6 +343,10 @@ html {
 .floating-site-header[data-visible="true"] {
   opacity: 1;
   transform: translate3d(0, var(--dock, 0px), 0);
+}
+
+.manager-mobile-visual {
+  display: none;
 }
 
 .floating-site-header[data-docking="true"] {
@@ -862,6 +884,204 @@ html {
   opacity: 0;
 }
 
+/* Подпись «Шаг N из 4» (StepDone.tsx) есть только на телефоне — см. mobile.css. */
+.u-step-caption {
+  display: none;
+}
+
+/*
+  Плашка закрытого шага (StepToast.tsx) — когда номер шага за экраном.
+  Выезжает снизу с лёгким перелётом; галочка впечатывается и разлетаются
+  искры — тот же момент, что у номера над заголовком (u-step-stamp,
+  u-step-spark выше). Уходит короче и без перелёта.
+*/
+.step-toast {
+  position: fixed;
+  right: 0;
+  bottom: max(1rem, calc(env(safe-area-inset-bottom) + 0.5rem));
+  left: 0;
+  z-index: 95;
+  display: flex;
+  justify-content: center;
+  padding-inline: 1rem;
+  pointer-events: none;
+  transition: bottom 240ms var(--ease-out);
+}
+/* Круглая кнопка возврата внизу справа — плашка встаёт над ней. */
+html:has(.hm-return[data-shown="true"]) .step-toast {
+  bottom: calc(max(1rem, calc(env(safe-area-inset-bottom) + 0.5rem)) + 4rem);
+}
+.step-toast-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: min(100%, 26rem);
+  padding: 0.625rem 0.625rem 0.625rem 0.75rem;
+  border-radius: 1.25rem;
+  background: var(--color-navy);
+  color: var(--color-surface);
+  box-shadow: 0 0.75rem 2rem rgb(14 23 54 / 0.35);
+  font-family: var(--font-sans);
+  opacity: 0;
+  translate: 0 calc(100% + 1.5rem);
+  cursor: pointer;
+  transition:
+    translate 220ms cubic-bezier(0.4, 0, 1, 1),
+    opacity 200ms ease-out;
+}
+.step-toast[data-shown="true"] .step-toast-card {
+  opacity: 1;
+  translate: 0 0;
+  pointer-events: auto;
+  transition:
+    translate 460ms cubic-bezier(0.2, 0.9, 0.25, 1.12),
+    opacity 200ms ease-out;
+}
+.step-toast-mark {
+  position: relative;
+  flex: none;
+  width: 2.5rem;
+  height: 2.5rem;
+}
+.step-toast-mark img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+}
+.step-toast[data-shown="true"] .step-toast-mark img {
+  animation: u-step-stamp 460ms var(--ease-pop) 200ms both;
+}
+.step-toast-mark i {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0.3125rem;
+  height: 0.3125rem;
+  margin: -0.15625rem 0 0 -0.15625rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  opacity: 0;
+}
+.step-toast-mark i:nth-child(3n + 2) {
+  background: var(--color-blush);
+}
+.step-toast-mark i:nth-child(3n) {
+  background: var(--color-surface);
+}
+.step-toast[data-shown="true"] .step-toast-mark i {
+  animation: u-step-spark 620ms var(--ease-out) both;
+  animation-delay: calc(300ms + var(--i) * 18ms);
+}
+.step-toast-text {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 0.125rem;
+}
+.step-toast-text b {
+  font-size: 0.9375rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+.step-toast-text small {
+  overflow: hidden;
+  color: rgb(255 255 255 / 0.72);
+  font-size: 0.75rem;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.step-toast-next {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  height: 2.5rem;
+  padding-inline: 0.875rem;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  color: var(--color-surface);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: scale 160ms var(--ease-out);
+}
+.step-toast-next:active {
+  scale: 0.96;
+}
+@media (prefers-reduced-motion: reduce) {
+  .step-toast-card,
+  .step-toast[data-shown="true"] .step-toast-card {
+    translate: 0 0;
+  }
+}
+
+/*
+  Подтверждение заявки (RequestForm.tsx): после отправки форма накрывается
+  карточкой «Заявка отправлена». Раньше единственным ответом была галочка
+  у номера шага над формой — обычно за экраном, и было неясно, ушла ли
+  заявка. «Изменить данные» возвращает к полям.
+*/
+.rf-success {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 0.75rem;
+  padding: 2rem 1.5rem;
+  border-radius: inherit;
+  background: var(--color-surface);
+  text-align: center;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 260ms var(--ease-out),
+    visibility 0s linear 260ms;
+}
+.rf-success[data-shown="true"] {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 260ms var(--ease-out);
+}
+.rf-success-mark {
+  width: 4.5rem;
+  height: 4.5rem;
+  opacity: 0;
+}
+.rf-success[data-shown="true"] .rf-success-mark {
+  animation: u-step-stamp 520ms var(--ease-pop) 140ms both;
+}
+.rf-success-title {
+  color: var(--color-ink);
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: 900;
+  line-height: 1.05;
+  outline: none;
+}
+.rf-success-text {
+  max-width: 21rem;
+  color: var(--color-ink-secondary);
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  line-height: 1.45;
+}
+.rf-success-edit {
+  margin-top: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  border: 0;
+  background: none;
+  color: var(--color-primary);
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+
 /*
   Подсказка под заголовком шага: залы, пакеты, дата, заявка.
 
@@ -1361,27 +1581,42 @@ html {
   разного цвета — розовая, красная и тёмно-синяя, — и одно и то же затемнение
   на них читалось бы по-разному. Насыщенность гасит все три одинаково.
 */
+/*
+  Правила с :hover — только там, где есть курсор. На iPhone касание оставляет
+  карточку в :hover, и соседние карточки меняли вид прямо в момент нажатия —
+  Safari в таком случае может счесть касание наведением и не отправить клик.
+*/
 .u-package-card[data-dim="true"],
-#packages:has(.u-package-card:hover) .u-package-card:not(:hover),
-#packages[data-picked="happy"]:not(:has(.u-package-card:hover))
-  .u-package-card:not([data-package="happy"]),
-#packages[data-picked="extra"]:not(:has(.u-package-card:hover))
-  .u-package-card:not([data-package="extra"]),
-#packages[data-picked="wow"]:not(:has(.u-package-card:hover))
-  .u-package-card:not([data-package="wow"]) {
+#packages[data-picked="happy"] .u-package-card:not([data-package="happy"]),
+#packages[data-picked="extra"] .u-package-card:not([data-package="extra"]),
+#packages[data-picked="wow"] .u-package-card:not([data-package="wow"]) {
   filter: saturate(0.42) opacity(0.72);
   scale: 0.985;
 }
-
-#packages:has(.u-package-card:hover) .u-package-card:not(:hover) .u-package-mascot,
-#packages[data-picked="happy"]:not(:has(.u-package-card:hover))
-  .u-package-card:not([data-package="happy"]) .u-package-mascot,
-#packages[data-picked="extra"]:not(:has(.u-package-card:hover))
-  .u-package-card:not([data-package="extra"]) .u-package-mascot,
-#packages[data-picked="wow"]:not(:has(.u-package-card:hover))
-  .u-package-card:not([data-package="wow"]) .u-package-mascot {
+#packages[data-picked="happy"] .u-package-card:not([data-package="happy"]) .u-package-mascot,
+#packages[data-picked="extra"] .u-package-card:not([data-package="extra"]) .u-package-mascot,
+#packages[data-picked="wow"] .u-package-card:not([data-package="wow"]) .u-package-mascot {
   opacity: 0;
   translate: 0 1.5rem;
+}
+@media (hover: hover) and (pointer: fine) {
+  /* Наведение важнее выбора: под курсором — наведённая карточка, а не выбранная. */
+  #packages:has(.u-package-card:hover) .u-package-card:not(:hover) {
+    filter: saturate(0.42) opacity(0.72);
+    scale: 0.985;
+  }
+  #packages:has(.u-package-card:hover) .u-package-card:hover {
+    filter: none;
+    scale: 1;
+  }
+  #packages:has(.u-package-card:hover) .u-package-card:not(:hover) .u-package-mascot {
+    opacity: 0;
+    translate: 0 1.5rem;
+  }
+  #packages:has(.u-package-card:hover) .u-package-card:hover .u-package-mascot {
+    opacity: 1;
+    translate: 0 0;
+  }
 }
 
 /*
@@ -1541,6 +1776,49 @@ html {
   .u-faq[data-open="false"]:active {
     translate: 0 0;
     box-shadow: none;
+  }
+
+  /*
+    Раскрытие ответа. Высоту заранее не знаем, поэтому анимируется строка
+    грида 0fr → 1fr; сам текст проявляется и чуть съезжает на место с
+    небольшой задержкой — открытие читается мягко, но не тянется.
+    Закрытие быстрее: текст гаснет сразу, высота уходит следом.
+  */
+  .u-faq-panel {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 320ms var(--ease-out);
+  }
+  .u-faq[data-open="true"] .u-faq-panel {
+    grid-template-rows: 1fr;
+  }
+  .u-faq-clip {
+    min-height: 0;
+    overflow: hidden;
+  }
+  .u-faq-body {
+    opacity: 0;
+    translate: 0 -0.375rem;
+    transition:
+      opacity 160ms var(--ease-out),
+      translate 240ms var(--ease-out);
+  }
+  .u-faq[data-open="true"] .u-faq-body {
+    opacity: 1;
+    translate: 0 0;
+    transition:
+      opacity 260ms var(--ease-out) 70ms,
+      translate 320ms var(--ease-out) 40ms;
+  }
+
+  /* Плюс превращается в минус: вертикальная черта сжимается, а не пропадает. */
+  .u-faq-plus {
+    transform-box: fill-box;
+    transform-origin: center;
+    transition: transform 260ms var(--ease-out);
+  }
+  .u-faq[data-open="true"] .u-faq-plus {
+    transform: scaleY(0);
   }
 
   /*
@@ -2326,6 +2604,26 @@ html {
 .food-modal-open {
   overflow: hidden;
 }
+/*
+  Затемнение страницы под открытым окном (меню с едой, меню сайта) — слоем
+  самой страницы, а не ::backdrop. Safari 26 на iPhone не рисует fixed-слои
+  и ::backdrop под строкой состояния и панелью браузера, а сама страница под
+  ними видна: сверху и снизу оставались незатемнённые полосы. Слой в потоке
+  страницы (absolute на всю её высоту) виден и там, поэтому затемнение ровное
+  по всему экрану. ::backdrop у этих окон прозрачный — иначе в середине
+  экрана затемнение легло бы дважды.
+*/
+html:is(.food-modal-open, [data-menu-open]) body {
+  position: relative;
+}
+html:is(.food-modal-open, [data-menu-open]) body::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2147483000;
+  background: rgb(14 23 54 / 0.55);
+  pointer-events: none;
+}
 .u-food-modal {
   /*
     Ширина и высота под содержимое: набор — это фотография стола и шесть
@@ -2333,7 +2631,11 @@ html {
     действием там, где места хватало: окно занимало 64em при доступных 96vw.
   */
   width: min(76em, calc(100vw - 1.5rem));
-  max-height: min(94dvh, 62em);
+  /*
+    Высота окна — от --app-vh (layout.tsx), а не от dvh: на iPhone (iOS 26.3)
+    dvh внутри модального окна считался нулём, и окно открывалось высотой 0.
+  */
+  max-height: min(calc(var(--app-vh, 100vh) * 0.94), 62em);
   margin: auto;
   padding: 0;
   border: 0;
@@ -2346,8 +2648,8 @@ html {
 }
 .u-food-modal[data-view="menu"] {
   width: min(96vw, 96em);
-  height: 94dvh;
-  max-height: 94dvh;
+  height: calc(var(--app-vh, 100vh) * 0.94);
+  max-height: calc(var(--app-vh, 100vh) * 0.94);
 }
 .u-food-modal[data-view="menu"] .u-food-head {
   padding: 0.8em 4.5em 0.8em 1.35em;
@@ -2367,9 +2669,15 @@ html {
 .u-food-modal[data-view="menu"] .u-food-tabs {
   padding: 0.45em 1.35em;
 }
+/* Страховка: окно открыто не модально (showModal отказал) — всё равно поверх страницы. */
+.u-food-modal[open]:not(:modal) {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+}
+/* Прозрачный: затемняет слой страницы (html.food-modal-open body::after выше). */
 .u-food-modal::backdrop {
-  background: rgb(14 23 54 / 0.66);
-  backdrop-filter: blur(0.35em);
+  background: transparent;
 }
 .u-food-modal[open] {
   animation: food-modal-in 240ms var(--ease-out);
@@ -2386,11 +2694,22 @@ html {
 @keyframes food-backdrop-in {
   from { opacity: 0; }
 }
+/*
+  Высота панели — по содержимому (auto), ограничена max-height окна; длинный
+  набор прокручивается внутри .u-food-body. Не height: 100%: у <dialog> своя
+  высота «по содержимому» (fit-content), и процент от неё — замкнутый круг.
+  Safari на iPhone (iOS 26.3) решал его в ноль: окно открывалось высотой 0,
+  и было видно только затемнение. Процентная высота — только когда высота
+  окна задана явно (полное меню на десктопе, ниже).
+*/
 .u-food-panel {
   display: flex;
-  height: 100%;
+  height: auto;
   max-height: inherit;
   flex-direction: column;
+}
+.u-food-modal[data-view="menu"] .u-food-panel {
+  height: 100%;
 }
 .u-food-head {
   position: relative;
@@ -2510,7 +2829,7 @@ html {
     которой не хватает списку. Поэтому потолок в долях экрана — кадр просто
     подрезается, он снят сверху и края в нём не несут смысла.
   */
-  max-height: 40dvh;
+  max-height: calc(var(--app-vh, 100vh) * 0.4);
   border-radius: 1.2em;
   background: var(--color-blush);
 }
@@ -2737,13 +3056,26 @@ html {
 @media (max-width: 700px) {
   .u-food-modal {
     width: calc(100vw - 1rem);
-    max-height: 94dvh;
+    max-height: calc(var(--app-vh, 100vh) * 0.94);
     border-radius: 1.2em;
   }
+  /*
+    Полное меню на телефоне: почти во всю ширину — страницу меню читают, и
+    каждый пиксель ширины идёт в кегль. Высота — по самой странице
+    (--menu-page-h считает FoodMenuModal), окно по центру экрана без пустых
+    полос над и под страницей.
+  */
   .u-food-modal[data-view="menu"] {
-    width: calc(100vw - 0.5rem);
-    height: 96dvh;
-    max-height: 96dvh;
+    width: calc(100vw - 0.75rem);
+    max-width: calc(100vw - 0.75rem);
+    /*
+      fit-content, а не auto: модальное окно стоит fixed с inset: 0, и auto
+      растягивало его до max-height — под панелью оставалась пустая полоса.
+    */
+    height: fit-content;
+    max-height: calc(var(--app-vh, 100vh) - 0.75rem);
+    margin: auto;
+    border-radius: 1.2em;
   }
   .u-food-head { padding: 1.25em 4em 1em 1.15em; }
   .u-food-head h2 { font-size: 1.65em; }
@@ -2766,6 +3098,199 @@ html {
   .u-food-menu-page[data-position="next"] {
     transform: translateX(30%) translateY(0.65em) scale(0.84);
   }
+
+  /*
+    Полное меню на телефоне — лента страниц (FoodMenuModal, режим phone).
+    Страница целиком по размеру окна; свайп — к соседней. Увеличение —
+    двойным касанием или кнопкой: страница становится шире окна в 2.2 раза,
+    и её двигают пальцем, а лента на это время не листается.
+  */
+  /*
+    Окно меню — ровно по содержимому: шапка, вкладки, страница, панель.
+    Панель и тело не растягиваются на всю допустимую высоту окна (иначе под
+    панелью оставалась пустая полоса), а у тела нет полей — вся ширина окна
+    идёт странице. Вес через data-view: иначе мобильное .u-food-body с полями
+    стоит ниже и перебивает.
+  */
+  .u-food-modal[data-view="menu"] .u-food-panel {
+    height: auto;
+  }
+  .u-food-modal[data-view="menu"] .u-food-body {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    padding: 0;
+  }
+  .u-food-strip-view {
+    display: flex;
+    flex: none;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .u-food-strip {
+    display: flex;
+    flex: none;
+    min-height: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    background: linear-gradient(180deg, var(--color-page), #f8edef);
+  }
+  .u-food-strip::-webkit-scrollbar {
+    display: none;
+  }
+  .u-food-strip-page {
+    flex: 0 0 100%;
+    min-width: 0;
+    height: calc(var(--menu-page-h, calc(var(--app-vh, 100vh) * 0.7)) + 0.75rem);
+    padding: 0.375rem;
+    scroll-snap-align: start;
+    scroll-snap-stop: always;
+  }
+  .u-food-strip-scroll {
+    display: flex;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    justify-content: center;
+    align-items: center;
+    border-radius: 1em;
+    -webkit-tap-highlight-color: transparent;
+  }
+  /*
+    Страница целиком, по своим пропорциям: картинка ровно размером со
+    страницу, а не вписана в прямоугольник, — иначе скругление приходилось
+    бы на пустые поля, а у самой страницы углы оставались бы острыми.
+  */
+  .u-food-strip-img {
+    width: auto;
+    height: auto;
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: 1rem;
+    box-shadow: 0 0.5em 1.4em rgb(14 23 54 / 0.14);
+    user-select: none;
+    -webkit-user-drag: none;
+  }
+  .u-food-strip-view[data-zoom="true"] .u-food-strip {
+    overflow-x: hidden;
+  }
+  .u-food-strip-view[data-zoom="true"]
+    .u-food-strip-page[data-current="true"]
+    .u-food-strip-scroll {
+    display: block;
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+  .u-food-strip-view[data-zoom="true"]
+    .u-food-strip-page[data-current="true"]
+    .u-food-strip-img {
+    width: 220%;
+    height: auto;
+    max-width: none;
+    max-height: none;
+  }
+
+  .u-food-strip-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.6em 0.75em max(0.6em, env(safe-area-inset-bottom));
+    border-top: 1px solid rgb(14 23 54 / 0.08);
+    background: var(--color-surface);
+  }
+  .u-food-strip-btn {
+    display: grid;
+    flex: none;
+    width: 2.75rem;
+    height: 2.75rem;
+    place-items: center;
+    border: 1px solid var(--color-border-soft);
+    border-radius: 999px;
+    background: var(--color-surface);
+    color: var(--color-ink);
+  }
+  .u-food-strip-btn svg {
+    width: 1.1em;
+  }
+  .u-food-strip-btn:disabled {
+    opacity: 0.35;
+  }
+  .u-food-strip-btn:not(:disabled):active {
+    transform: scale(0.94);
+  }
+  /* Главное действие панели — скачать меню: акцентная кнопка на всё место. */
+  .u-food-strip-download {
+    display: inline-flex;
+    flex: 1;
+    min-width: 0;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4em;
+    height: 2.75rem;
+    padding: 0 0.75em;
+    border-radius: 999px;
+    background: var(--color-primary);
+    color: var(--color-surface);
+    font-size: 0.9em;
+    font-weight: 700;
+    white-space: nowrap;
+    -webkit-tap-highlight-color: transparent;
+    transition: background-color 160ms var(--ease-out), transform 160ms var(--ease-out);
+  }
+  .u-food-strip-download svg {
+    flex: none;
+    width: 1.1em;
+  }
+  .u-food-strip-download:active {
+    transform: scale(0.96);
+    background: #c73544;
+  }
+  /* Увеличение — вспомогательное: контурная кнопка, как стрелки. */
+  .u-food-strip-zoom {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    gap: 0.35em;
+    height: 2.75rem;
+    padding: 0 0.8em;
+    border: 1px solid var(--color-border-soft);
+    border-radius: 999px;
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font-size: 0.9em;
+    font-weight: 700;
+    white-space: nowrap;
+    transition: background-color 160ms var(--ease-out), color 160ms var(--ease-out), transform 160ms var(--ease-out);
+  }
+  .u-food-strip-zoom svg {
+    width: 1.1em;
+  }
+  .u-food-strip-zoom[aria-pressed="true"] {
+    border-color: var(--color-navy);
+    background: var(--color-navy);
+    color: var(--color-surface);
+  }
+  /*
+    Самые узкие телефоны: подписи «Скачать меню» и «Увеличить» вдвоём не
+    помещаются. Уступает вспомогательная — у увеличения остаётся лупа, круглая
+    кнопка как стрелки.
+  */
+  @media (max-width: 379.98px) {
+    .u-food-strip-zoom {
+      justify-content: center;
+      width: 2.75rem;
+      padding: 0;
+    }
+    .u-food-strip-zoom-label {
+      display: none;
+    }
+  }
+  .u-food-strip-zoom:active {
+    transform: scale(0.96);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -2785,6 +3310,12 @@ html {
   пошёл, объяснять больше нечего — она уходит, чтобы не загораживать кадр.
 */
 .u-reel-play {
+  /*
+    Значок лежит поверх кнопки во весь кадр (.u-reel-hit) — нажатие должно
+    проходить сквозь него в кнопку, иначе центр карточки не нажимался бы.
+  */
+  z-index: 2;
+  pointer-events: none;
   background-color: var(--color-blush);
   color: var(--color-navy);
   transition:
@@ -2832,14 +3363,90 @@ html {
     transform: scale(1.03);
   }
 }
-/* Клавиатурный обход доходит до карточки — отклик тот же, что на наведении. */
-.u-reel:focus-visible .u-reel-play {
+/*
+  Клавиатурный обход доходит до карточки — отклик тот же, что на наведении.
+  Фокус получает кнопка во весь кадр внутри карточки (сама карточка — обёртка,
+  в ней ещё кнопка звука), поэтому признак берём через :has.
+*/
+.u-reel:has(.u-reel-hit:focus-visible) .u-reel-play {
   opacity: 0;
   scale: 0.86;
 }
-.u-reel:focus-visible .u-reel-media,
-.u-reel:focus-visible .u-reel-video {
+.u-reel:has(.u-reel-hit:focus-visible) .u-reel-media,
+.u-reel:has(.u-reel-hit:focus-visible) .u-reel-video {
   transform: scale(1.03);
+}
+.u-reel-hit {
+  z-index: 1;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  -webkit-tap-highlight-color: transparent;
+}
+.u-reel-hit:focus-visible {
+  outline: 0.1875rem solid var(--color-surface);
+  outline-offset: -0.375rem;
+}
+
+/*
+  Кнопки в правом верхнем углу, видны всегда: «во весь экран» — в самом углу,
+  звук — слева от неё. Тёмная полупрозрачная плашка с размытием: читается и
+  на светлом кадре, и на тёмном. Включённый звук — белая плашка, чтобы
+  состояние было видно издалека.
+*/
+.u-reel-sound,
+.u-reel-full {
+  position: absolute;
+  top: 0.875rem;
+  right: 0.875rem;
+  z-index: 3;
+  display: grid;
+  width: 2.75rem;
+  height: 2.75rem;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: rgb(14 23 54 / 0.46);
+  color: var(--color-surface);
+  backdrop-filter: blur(0.5rem);
+  -webkit-backdrop-filter: blur(0.5rem);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background-color 200ms var(--ease-out),
+    color 200ms var(--ease-out),
+    opacity 200ms var(--ease-out),
+    scale 160ms var(--ease-out);
+}
+.u-reel-sound {
+  right: 4.125rem;
+}
+.u-reel-sound svg,
+.u-reel-full svg {
+  width: 1.375rem;
+  height: 1.375rem;
+}
+.u-reel-sound[data-on="true"] {
+  background: rgb(255 255 255 / 0.92);
+  color: var(--color-navy);
+}
+.u-reel-sound:active,
+.u-reel-full:active {
+  scale: 0.92;
+}
+.u-reel-sound:focus-visible,
+.u-reel-full:focus-visible {
+  outline: 0.125rem solid var(--color-surface);
+  outline-offset: 0.125rem;
+}
+@media (hover: hover) and (pointer: fine) {
+  .u-reel-sound:hover,
+  .u-reel-full:hover {
+    background: var(--color-primary);
+    color: var(--color-surface);
+  }
 }
 
 /*
@@ -2857,9 +3464,38 @@ html {
   Область нажатия шире самой отметки: квадрат 18×18 виден как есть, но ловит
   палец на 44×44 — псевдоэлемент растянут вокруг, ничего при этом не сдвигая.
 */
+/*
+  Отметка согласия — круг, а не квадрат: спокойнее рядом со скруглёнными
+  полями формы. Нарисована сама (appearance: none): пустая — белый круг с
+  тонкой обводкой, отмеченная — красный круг с белой галочкой.
+*/
 .u-consent-box {
   position: relative;
+  display: grid;
+  place-content: center;
+  margin: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  border: 1.5px solid var(--color-border-soft);
+  border-radius: 50%;
+  background: var(--color-surface) center / 62% no-repeat;
   cursor: pointer;
+  transition:
+    background-color 160ms var(--ease-out),
+    border-color 160ms var(--ease-out),
+    scale 160ms var(--ease-out);
+}
+.u-consent-box:checked {
+  border-color: var(--color-primary);
+  background-color: var(--color-primary);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.5 8.4l3 2.9 6-6.3' fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+.u-consent-box:active {
+  scale: 0.92;
+}
+.u-consent-box:focus-visible {
+  outline: 0.125rem solid var(--color-primary);
+  outline-offset: 0.125rem;
 }
 .u-consent-box::after {
   content: "";

@@ -1,7 +1,9 @@
 "use client";
 
+import { scrollToSection } from "@/lib/navigation";
+
 import { pickPackage, useOrder } from "@/lib/order";
-import type { PackageId } from "@/lib/pricing";
+import { getPackage, type PackageId } from "@/lib/pricing";
 
 /**
  * Кнопка «выбрать» в карточке пакета. Запоминает выбор и уводит к календарю:
@@ -29,7 +31,7 @@ export default function PickPackage({
       href="#price"
       className="u-chip"
       data-picked={picked}
-      aria-label={picked ? "Пакет выбран, перейти к расчёту" : "Выбрать пакет"}
+      aria-label={picked ? `Отменить выбор пакета ${getPackage(id).short}` : `Выбрать пакет ${getPackage(id).short}`}
       style={style}
       onClick={(event) => {
         /*
@@ -51,7 +53,7 @@ export default function PickPackage({
         event.preventDefault();
         pickPackage(id);
         window.setTimeout(() => {
-          window.location.hash = "price";
+          scrollToSection("price");
         }, HOLD);
       }}
     >

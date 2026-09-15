@@ -1,10 +1,18 @@
 "use client";
+import { useHydrated } from "@/lib/useHydrated";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+  formatMessenger,
+  formatPhone,
+  normalizeMessenger,
+  normalizePhone,
+} from "@/lib/contact-input";
+import { CONTACTS } from "@/lib/contacts";
 import SectionHeading from "./SectionHeading";
 import StepDone from "./StepDone";
 import { box, px } from "@/lib/px";
-import { markSent, pickHall, useOrder } from "@/lib/order";
+import { markSent, pickHall, useOrder, setOrder } from "@/lib/order";
 import { MONTHS_OF, getPackage, money, totalOf } from "@/lib/pricing";
 import { LEGAL, type LegalId } from "@/lib/legal";
 import { HALL_TITLES as HALLS } from "@/lib/halls.mjs";
@@ -26,50 +34,22 @@ import LegalModal from "./LegalModal";
   при расхождении <select> не нашёл бы совпадения и показал пустое поле.
 */
 
-/** Гостей считают с запасом, поэтому вилки, а не точное число. */
+/**
+ * Гостей считают с запасом, поэтому вилки, а не точное число.
+ *
+ * Подписи короткие: на телефоне список стоит в половину ширины рядом с залом,
+ * и «больше 30 человек» обрезалось. Над полем подпись «Сколько гостей», так
+ * что «чел.» читается однозначно.
+ */
 const GUESTS = [
-  "до 5 человек",
-  "до 10 человек",
-  "до 15 человек",
-  "до 20 человек",
-  "до 25 человек",
-  "больше 30 человек",
+  "до 5 чел.",
+  "до 10 чел.",
+  "до 15 чел.",
+  "до 20 чел.",
+  "до 25 чел.",
+  "до 30 чел.",
+  "больше 30 чел.",
 ];
-
-/**
- * Ник в мессенджере: собачка ставится сама и всегда одна. Внутри — только
- * латиница, цифры и подчёркивание: и Telegram, и MAX других символов в нике
- * не допускают, поэтому кириллицу и пробелы отсекаем сразу, а не после
- * отправки. Пустое поле оставляем пустым, иначе одинокая собачка выглядела бы
- * как заполненное.
- */
-function formatHandle(raw: string) {
-  const body = raw.replace(/[^A-Za-z0-9_]/g, "");
-  return body ? `@${body}` : "";
-}
-
-/**
- * Из любого ввода достаём номер абонента: десять цифр после +7. Восьмёрку и
- * семёрку в начале съедаем — код страны уже в маске, а первая цифра номера у
- * мобильных всегда девятка, поэтому всё до неё отбрасываем.
- */
-function subscriberDigits(raw: string) {
-  let d = raw.replace(/\D/g, "");
-  if (d.startsWith("7") || d.startsWith("8")) d = d.slice(1);
-  while (d && d[0] !== "9") d = d.slice(1);
-  return d.slice(0, 10);
-}
-
-/** «+7 (916) 123-45-67» — разделители появляются по мере набора. */
-function formatPhone(d: string) {
-  if (!d) return "";
-  let out = `+7 (${d.slice(0, 3)}`;
-  if (d.length >= 3) out += ")";
-  if (d.length > 3) out += ` ${d.slice(3, 6)}`;
-  if (d.length > 6) out += `-${d.slice(6, 8)}`;
-  if (d.length > 8) out += `-${d.slice(8, 10)}`;
-  return out;
-}
 
 const CHEVRON = (
   <svg
@@ -92,21 +72,35 @@ const CHEVRON = (
 export default function RequestForm() {
   const order = useOrder();
 
-  const [name, setName] = useState("");
-  const [guests, setGuests] = useState("");
-  const [phone, setPhone] = useState("");
-  const [messenger, setMessenger] = useState("");
-  const [wish, setWish] = useState("");
+  const name = order.name;
+  const setName = (value: string) => setOrder({ name: value });
+  const guests = order.guests;
+  const setGuests = (value: string) => setOrder({ guests: value });
+  const phone = order.phone;
+  const setPhone = (value: string) => setOrder({ phone: value });
+  const messenger = order.messenger;
+  const setMessenger = (value: string) => setOrder({ messenger: value });
+  const wish = order.wish;
+  const setWish = (value: string) => setOrder({ wish: value });
+  const hydrated = useHydrated();
   const [consent, setConsent] = useState(false);
+  /** Телефон: раскрыто ли необязательное поле пожелания. */
+  const [extras, setExtras] = useState(false);
   const [missing, setMissing] = useState({
     name: false,
     phone: false,
+    messenger: false,
     consent: false,
   });
   /** Документ, открытый поверх формы: то же окно, что и в подвале. */
   const [legal, setLegal] = useState<LegalId | null>(null);
   /* Курсор на кнопке отправки: по нему живёт подсказка под заголовком. */
   const [aiming, setAiming] = useState(false);
+
+  /** Заявка ушла — форму накрывает подтверждение (.rf-success). */
+  const [thanks, setThanks] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+  const thanksRef = useRef<HTMLHeadingElement>(null);
 
   const nameRef = useRef<HTMLInputElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
@@ -118,17 +112,10 @@ export default function RequestForm() {
    */
   const consentAtRef = useRef<string | null>(null);
 
-  const phoneDigits = subscriberDigits(phone);
-  const phoneReady = phoneDigits.length === 10;
+  const normalizedPhone = normalizePhone(phone);
+  const phoneReady = normalizedPhone !== null;
+  const normalizedMessenger = normalizeMessenger(messenger);
   const nameReady = name.trim().length > 0;
-
-  function onPhoneChange(next: string) {
-    let d = subscriberDigits(next);
-    // стёрли разделитель — значит хотели стереть цифру перед ним
-    if (next.length < phone.length && d.length === phoneDigits.length)
-      d = d.slice(0, -1);
-    setPhone(formatPhone(d));
-  }
 
   /** Перезапуск анимации: без снятия класса второй промах прошёл бы молча. */
   function shake(el: HTMLElement | null) {
@@ -140,7 +127,7 @@ export default function RequestForm() {
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const bad = { name: !nameReady, phone: !phoneReady, consent: !consent };
+    const bad = { name: !nameReady, phone: !phoneReady, messenger: normalizedMessenger === null, consent: !consent };
     setMissing(bad);
 
     /*
@@ -148,7 +135,7 @@ export default function RequestForm() {
       кнопка молча не нажимается и не объясняет причину. Промах показываем
       отказом — тряской поля и подписью под кнопкой.
     */
-    if (bad.name || bad.phone || bad.consent) {
+    if (bad.name || bad.phone || bad.messenger || bad.consent) {
       if (bad.name) shake(nameRef.current);
       if (bad.phone) shake(phoneRef.current);
       if (bad.consent) shake(consentRef.current);
@@ -156,12 +143,30 @@ export default function RequestForm() {
         ? nameRef.current
         : bad.phone
           ? phoneRef.current
-          : consentRef.current?.querySelector<HTMLInputElement>("#consent");
+          : bad.messenger
+            ? document.getElementById("messenger")
+            : consentRef.current?.querySelector<HTMLInputElement>("#consent");
       first?.focus();
       return;
     }
 
     markSent();
+
+    /*
+      Подтверждение — на месте формы, и форма должна быть в кадре: если она
+      видна не целиком, подтягиваем её к центру экрана. Фокус — на заголовок
+      подтверждения, чтобы читалка экрана сразу его произнесла.
+    */
+    setThanks(true);
+    requestAnimationFrame(() => {
+      const form = formRef.current;
+      if (!form) return;
+      const r = form.getBoundingClientRect();
+      if (r.top < 64 || r.bottom > window.innerHeight) {
+        form.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+      thanksRef.current?.focus({ preventScroll: true });
+    });
 
     /*
       Точка подключения бэкенда: отправлять надо этот объект. Отметка согласия
@@ -171,14 +176,15 @@ export default function RequestForm() {
     */
     const payload = {
       hall: order.hall,
-      date: order.date,
-      pkg: order.pkg,
-      hours: order.hours,
-      total,
+      date: order.dateTouched ? order.date : null,
+      pkg: order.pkgTouched ? order.pkg : null,
+      hours: order.hoursTouched ? order.hours : null,
+      dateTouched: order.dateTouched, pkgTouched: order.pkgTouched, hoursTouched: order.hoursTouched,
+      estimate: { pkg: order.pkg, hours: order.hours, total: order.date ? total : null },
       name: name.trim(),
-      phone,
+      phone: normalizedPhone,
       guests,
-      messenger,
+      messenger: normalizedMessenger,
       wish,
       consent: {
         version: LEGAL.consent.version,
@@ -196,16 +202,13 @@ export default function RequestForm() {
     fontSize: px(14.1),
   };
 
-  const label = { fontSize: px(11.6), lineHeight: px(18) };
+  const label = { fontSize: "max(12px, 0.725rem)", lineHeight: px(18) };
 
   const выбранная = order.date
     ? (() => {
         const [y, m, d] = order.date.split("-").map(Number);
         return new Date(y, m - 1, d);
       })()
-    : null;
-  const chosen = выбранная
-    ? `${выбранная.getDate()} ${MONTHS_OF[выбранная.getMonth()]} ${выбранная.getFullYear()}`
     : null;
   /* Та же сумма, что в калькуляторе: считает её общий расчёт из pricing.ts. */
   const total = totalOf(order.pkg, order.hours, выбранная);
@@ -321,8 +324,10 @@ export default function RequestForm() {
       </p>
 
       <form
+        ref={formRef}
         data-node-id="914:1802"
-        className="rounded-md bg-surface"
+        data-extras={extras}
+        className="rf-form rounded-md bg-surface"
         style={{
           /*
             Высота 646 вместо 670: поле пожеланий стало на 24 ниже, и всё, что
@@ -332,11 +337,14 @@ export default function RequestForm() {
           ...box(230, 224, 980, 628),
           boxShadow: "var(--shadow-card-lg)",
         }}
+        method="post"
         onSubmit={onSubmit}
         noValidate
       >
+        <div className="rf-fields" inert={thanks} aria-hidden={thanks}>
+        <noscript><p className="rf-nojs">Для заполнения формы включи JavaScript или <a href={CONTACTS.phone.href}>позвони нам</a>.</p></noscript>
         {/* Зал 914:1803 — девять залов из секции «Выбери зал» */}
-        <div style={box(33, 33, 914, 69)}>
+        <div className="rf-hall" style={box(33, 33, 914, 69)}>
           <label
             htmlFor="hall"
             className="block font-sans font-semibold text-ink"
@@ -353,7 +361,11 @@ export default function RequestForm() {
               className="u-field block w-full appearance-none rounded-sm bg-surface-alt font-sans text-ink"
               style={{ ...field, paddingRight: px(34) }}
             >
-              <option value="">Помогите выбрать</option>
+              {/*
+                Коротко: на телефоне поле стоит в половину ширины рядом с
+                гостями, и «Помогите выбрать» обрезалось до «Помогите выб».
+              */}
+              <option value="">Подберём</option>
               {HALLS.map((h) => (
                 <option key={h} value={h}>
                   {h}
@@ -365,7 +377,7 @@ export default function RequestForm() {
         </div>
 
         {/* Имя 914:1812 — обязательное */}
-        <div style={box(33, 118, 448, 68)}>
+        <div className="rf-name" style={box(33, 118, 448, 68)}>
           <label
             htmlFor="name"
             className="block font-sans font-semibold text-ink"
@@ -377,21 +389,25 @@ export default function RequestForm() {
             ref={nameRef}
             id="name"
             name="name"
+            autoComplete="name"
+            maxLength={100}
+            aria-describedby={missing.name ? "name-error" : undefined}
             required
             aria-invalid={missing.name}
             value={name}
             onChange={(e) => {
               setName(e.target.value);
-              if (missing.name) setMissing((m) => ({ ...m, name: false }));
+              if (missing.name && e.target.value.trim()) setMissing((m) => ({ ...m, name: false }));
             }}
             placeholder="Имя"
             className="u-field block w-full rounded-sm bg-surface-alt font-sans text-ink placeholder:text-ink-muted"
             style={field}
           />
+          {missing.name && <p id="name-error" className="rf-field-error">Введи имя</p>}
         </div>
 
-        {/* Гости 914:1820 — список от двух до шестидесяти */}
-        <div style={box(498, 118, 448, 68)}>
+        {/* Количество гостей */}
+        <div className="rf-guests" style={box(498, 118, 448, 68)}>
           <label
             htmlFor="guests"
             className="block font-sans font-semibold text-ink"
@@ -420,7 +436,7 @@ export default function RequestForm() {
         </div>
 
         {/* Телефон 914:1828 — обязательное, строго по маске */}
-        <div style={box(33, 203, 448, 90)}>
+        <div className="rf-phone" style={box(33, 203, 448, 90)}>
           <label
             htmlFor="phone"
             className="block font-sans font-semibold text-ink"
@@ -432,23 +448,59 @@ export default function RequestForm() {
             ref={phoneRef}
             id="phone"
             name="phone"
+            autoComplete="tel"
+            maxLength={40}
+            aria-describedby={missing.phone ? "phone-help" : undefined}
             type="tel"
             inputMode="tel"
             required
             aria-invalid={missing.phone}
             value={phone}
             onChange={(e) => {
-              onPhoneChange(e.target.value);
-              if (missing.phone) setMissing((m) => ({ ...m, phone: false }));
+              /* Маска «+7 (916) 123-45-67» собирается по мере набора — contact-input.ts. */
+              const next = formatPhone(e.target.value, phone);
+              setPhone(next);
+              if (missing.phone && normalizePhone(next)) setMissing((m) => ({ ...m, phone: false }));
             }}
-            placeholder="+7 (9__) ___-__-__"
+            placeholder="+7 (___) ___-__-__"
             className="u-field block w-full rounded-sm bg-surface-alt font-sans text-ink placeholder:text-ink-muted"
             style={field}
           />
+          {/*
+            Под полем — только причина отказа. Постоянной подсказки нет: маска
+            и так показывает, как набирать, а лишняя строка отвлекала.
+          */}
+          {missing.phone ? (
+            <p
+              id="phone-help"
+              className="rf-help-error font-sans"
+              style={{ marginTop: px(7), fontSize: px(10.8) }}
+            >
+              Номер неполный: нужно 10 цифр после +7
+            </p>
+          ) : null}
         </div>
 
+        {/*
+          Телефон: пожелание необязательно и свёрнуто за кнопкой — форма короче.
+          Мессенджер не сворачиваем: это второй способ связи, его должно быть
+          видно, — он стоит под телефоном с пометкой «необязательно».
+          На десктопе кнопки нет, поля стоят как в макете (mobile.css).
+        */}
+        <button
+          type="button"
+          className="rf-more"
+          aria-expanded={extras}
+          onClick={() => {
+            setExtras(true);
+            window.setTimeout(() => document.getElementById("wish")?.focus(), 60);
+          }}
+        >
+          + Вопрос или пожелание
+        </button>
+
         {/* Мессенджер 914:1836 */}
-        <div style={box(498, 203, 448, 90)}>
+        <div className="rf-messenger" style={box(498, 203, 448, 90)}>
           <label
             htmlFor="messenger"
             className="block font-sans font-semibold text-ink"
@@ -460,21 +512,35 @@ export default function RequestForm() {
             id="messenger"
             name="messenger"
             value={messenger}
-            onChange={(e) => setMessenger(formatHandle(e.target.value))}
-            placeholder="@username"
+            onChange={(e) => {
+              /* Собачка ставится сама, ссылка остаётся ссылкой — contact-input.ts. */
+              const next = formatMessenger(e.target.value);
+              setMessenger(next);
+              if (normalizeMessenger(next) !== null) setMissing((m) => ({ ...m, messenger: false }));
+            }}
+            maxLength={200}
+            autoCapitalize="none"
+            spellCheck={false}
+            aria-invalid={missing.messenger}
+            aria-describedby={missing.messenger ? "messenger-help" : undefined}
+            placeholder="@username Telegram или Max"
             className="u-field block w-full rounded-sm bg-surface-alt font-sans text-ink placeholder:text-ink-muted"
             style={field}
           />
-          <p
-            className="font-sans text-ink-muted"
-            style={{ marginTop: px(7), fontSize: px(10.8) }}
-          >
-            Telegram или MAX
-          </p>
+          {/* Как и у телефона — только причина отказа; как заполнять, говорит placeholder. */}
+          {missing.messenger ? (
+            <p
+              id="messenger-help"
+              className="rf-help-error font-sans"
+              style={{ marginTop: px(7), fontSize: px(10.8) }}
+            >
+              Введи @ник латиницей или ссылку t.me / max.ru
+            </p>
+          ) : null}
         </div>
 
         {/* Пожелание 914:1842 */}
-        <div style={box(33, 309, 914, 90)}>
+        <div className="rf-wish" style={box(33, 309, 914, 90)}>
           <label
             htmlFor="wish"
             className="block font-sans font-semibold text-ink"
@@ -485,6 +551,7 @@ export default function RequestForm() {
           <textarea
             id="wish"
             name="wish"
+            maxLength={2000}
             rows={3}
             value={wish}
             onChange={(e) => setWish(e.target.value)}
@@ -501,17 +568,27 @@ export default function RequestForm() {
 
         {/* Сводка выбранного 914:1848 — то же, что в калькуляторе выше */}
         <div
-          className="flex items-center rounded-sm bg-surface-alt"
+          className="rf-summary flex items-center rounded-sm bg-surface-alt"
           style={{ ...box(33, 422, 914, 48), paddingInline: px(18) }}
         >
-          <p
-            className="font-sans font-medium text-ink"
-            style={{ fontSize: px(13.3) }}
-          >
-            {chosen
-              ? `${chosen} · пакет ${getPackage(order.pkg).title} · ${order.hours} ч`
-              : `Пакет ${getPackage(order.pkg).title} · ${order.hours} ч`}
-          </p>
+          {/*
+            Три подписанные колонки вместо строки через точку: подпись сверху,
+            значение под ней — взгляд сразу находит дату, пакет и время.
+          */}
+          <dl className="rf-summary-list font-sans">
+            <div>
+              <dt>Дата</dt>
+              <dd>{короткаяДата ?? "не выбрана"}</dd>
+            </div>
+            <div>
+              <dt>Пакет</dt>
+              <dd>{getPackage(order.pkg).short}</dd>
+            </div>
+            <div>
+              <dt>Время</dt>
+              <dd>{order.hours} ч</dd>
+            </div>
+          </dl>
           {/*
             Сумма из калькулятора. Человек считал её наверху, а отправляет
             заявку здесь: без неё приходится верить памяти или возвращаться
@@ -520,12 +597,14 @@ export default function RequestForm() {
             итог.
           */}
           <p
+            data-empty={!выбранная}
             className="u-form-total ml-auto font-sans font-bold text-ink"
             style={{ fontSize: px(13.3), marginRight: px(18) }}
           >
             {выбранная ? (
               <>
-                Итого <span className="text-primary">{money(total)}</span>
+                <span className="rf-total-label">Предварительно</span>{" "}
+                <span className="text-primary">{money(total)}</span>
               </>
             ) : (
               "Выбери дату — посчитаем"
@@ -556,7 +635,7 @@ export default function RequestForm() {
         */}
         <div
           ref={consentRef}
-          className="flex items-start"
+          className="rf-consent flex items-center"
           style={box(33, 476, 914, 37)}
         >
           <input
@@ -582,8 +661,9 @@ export default function RequestForm() {
               нельзя. Подпись рядом кликабельна через label, но полагаться
               только на неё нельзя: глазом человек целится в сам квадрат.
             */
-            className="u-consent-box shrink-0 rounded-xs border border-border-soft accent-[var(--color-primary)]"
-            style={{ width: px(18), height: px(18), marginTop: px(1) }}
+            /* Круглая отметка по центру текста — вид в globals.css (.u-consent-box). */
+            className="u-consent-box shrink-0"
+            style={{ width: px(20), height: px(20) }}
           />
           <span style={{ marginLeft: px(10) }}>
             <label
@@ -593,15 +673,13 @@ export default function RequestForm() {
               }`}
               style={{ fontSize: px(11.6), lineHeight: px(18) }}
             >
-              Даю отдельное{" "}
-              <button
-                type="button"
-                onClick={() => setLegal("consent")}
-                className="u-legal-link"
-              >
-                согласие на обработку персональных данных
-              </button>{" "}
-              для подготовки предложения и ответа на заявку.
+              {/*
+                Текст отметки — обычный, без ссылки внутри. Ссылка — это кнопка,
+                а кнопка переносится только целиком: «согласие на обработку
+                персональных данных» уезжало на вторую строку, и «Даю» стояло
+                одно. Документы — отдельной строкой ниже.
+              */}
+              Даю согласие на обработку персональных данных
             </label>
             <p
               id="consent-note"
@@ -612,15 +690,22 @@ export default function RequestForm() {
                 lineHeight: px(16),
               }}
             >
-              Условия обработки указаны в{" "}
+              Документы:{" "}
+              <button
+                type="button"
+                onClick={() => setLegal("consent")}
+                className="u-legal-link"
+              >
+                согласие
+              </button>
+              {" · "}
               <button
                 type="button"
                 onClick={() => setLegal("privacy")}
                 className="u-legal-link"
               >
-                политике конфиденциальности
+                политика конфиденциальности
               </button>
-              . Рекламные сообщения требуют отдельного согласия.
             </p>
           </span>
         </div>
@@ -628,13 +713,22 @@ export default function RequestForm() {
         {/* Кнопка 914:1857 */}
         <button
           type="submit"
+          disabled={!hydrated || thanks}
           onPointerEnter={(event) => {
             if (event.pointerType !== "touch") setAiming(true);
           }}
           onPointerLeave={() => setAiming(false)}
-          onFocus={() => setAiming(true)}
+          /*
+            Только фокус с клавиатуры. На телефоне касание тоже даёт кнопке
+            фокус: подсказка над формой менялась на длинную, форма съезжала
+            вниз, и палец отпускался уже мимо кнопки — заявка уходила со
+            второго нажатия.
+          */
+          onFocus={(event) => {
+            if (event.currentTarget.matches(":focus-visible")) setAiming(true);
+          }}
           onBlur={() => setAiming(false)}
-          className="u-cta font-extrabold hover:-translate-y-2 hover:bg-navy hover:text-surface"
+          className="rf-submit u-cta font-extrabold hover:-translate-y-2 hover:bg-navy hover:text-surface"
           style={{ ...box(33, 523, 914, 60), fontSize: px(18.3) }}
         >
           ОТПРАВИТЬ ЗАЯВКУ
@@ -646,7 +740,7 @@ export default function RequestForm() {
           человека только что отправили.
         */}
         <p
-          className={`text-center font-sans ${
+          className={`rf-status text-center font-sans ${
             missing.name || missing.phone || missing.consent
               ? "text-primary"
               : "text-ink-muted"
@@ -654,12 +748,43 @@ export default function RequestForm() {
           role="status"
           style={{ ...box(33, 597, 914, 16), fontSize: px(11.6) }}
         >
-          {missing.name || missing.phone
-            ? "Заполни имя и телефон — без них мы не сможем связаться"
+          {missing.name
+            ? "Введи имя"
+            : missing.phone ? "Проверь номер телефона"
+            : missing.messenger ? "Проверь адрес мессенджера"
             : missing.consent
               ? "Поставь отметку согласия — без неё мы не вправе принять заявку"
-              : "С тобой свяжется твой личный менеджер"}
+              : /* Без ошибки строки нет: «свяжется менеджер» уже сказано над формой. */ ""}
         </p>
+
+        </div>
+        <div
+          className="rf-success"
+          data-shown={thanks}
+          aria-hidden={!thanks}
+          inert={!thanks}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/steps/done.webp" alt="" aria-hidden className="rf-success-mark" />
+          <h3 ref={thanksRef} tabIndex={-1} className="rf-success-title">
+            Заявка отправлена
+          </h3>
+          <p className="rf-success-text">
+            Личный менеджер свяжется с тобой{phoneReady ? ` по номеру ${phone}` : ""}
+            , проверит дату и поможет с деталями.
+          </p>
+          <button
+            type="button"
+            className="rf-success-edit"
+            onClick={() => {
+              setThanks(false);
+              setOrder({ sent: false });
+              nameRef.current?.focus({ preventScroll: true });
+            }}
+          >
+            Изменить данные
+          </button>
+        </div>
       </form>
 
       <LegalModal id={legal} onClose={() => setLegal(null)} />

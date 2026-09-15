@@ -69,7 +69,7 @@ export default function Manager() {
       {/* Карточка-переписка 914:1188 */}
       <div
         data-node-id="914:1188"
-        className="rounded-lg bg-surface"
+        className="manager-desktop-card rounded-lg bg-surface"
         style={{
           ...box(277, 164, 659),
           minHeight: px(429),
@@ -93,13 +93,13 @@ export default function Manager() {
         <span
           aria-hidden
           className="rounded-pill"
-          style={{ ...box(88, 57, 7, 7), background: "#3BA55D" }}
+          style={{ ...box(88, 57, 7, 7), background: "#24723c" }}
         />
         <p
           className="font-sans"
-          style={{ ...box(101, 51, 55, 18), fontSize: px(13.4), color: "#3BA55D" }}
+          style={{ ...box(101, 51, 190, 18), fontSize: px(13.4), color: "#24723c" }}
         >
-          на связи
+          Пример общения
         </p>
 
         {/* Лента сообщений 914:1198 … 914:1208 */}
@@ -162,6 +162,17 @@ export default function Manager() {
         className="max-w-none"
         style={box(894, 150, 306, 459)}
       />
+
+      {/* Mobile composition: the approved phone-and-hand PNG is cropped by its wrapper. */}
+      <div className="manager-mobile-visual" aria-hidden="true">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/figma/manager/phone-hand-chat.webp"
+          alt=""
+          loading="lazy"
+          className="manager-mobile-phone"
+        />
+      </div>
     </section>
   );
 }

@@ -1,4 +1,6 @@
 "use client";
+import Link from "next/link";
+import { heroRunway } from "@/lib/heroRunway";
 
 /**
  * Логотип в шапке — возврат на первый экран.
@@ -16,7 +18,7 @@
  */
 export default function HeaderHome({ floating = false }: { floating?: boolean }) {
   return (
-    <a
+    <Link
       href="/"
       aria-label="MyWish — на первый экран"
       className="site-header-home"
@@ -26,7 +28,8 @@ export default function HeaderHome({ floating = false }: { floating?: boolean })
         if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
         event.preventDefault();
         window.scrollTo({
-          top: 0,
+          /* На iPhone «верх» — с запасом под часами, как при открытии страницы. */
+          top: heroRunway(),
           behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
             ? "auto"
             : "smooth",
@@ -45,6 +48,6 @@ export default function HeaderHome({ floating = false }: { floating?: boolean })
           floating ? "floating-header-logo" : "site-header-logo"
         } size-full max-w-none`}
       />
-    </a>
+    </Link>
   );
 }

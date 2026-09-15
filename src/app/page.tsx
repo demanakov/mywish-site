@@ -15,6 +15,7 @@ import Footer from "@/components/Footer";
 import FloatingHeader from "@/components/FloatingHeader";
 import ScrollReveal from "@/components/ScrollReveal";
 import OrderRestore from "@/components/OrderRestore";
+import StepToast from "@/components/StepToast";
 import { px } from "@/lib/px";
 
 /**
@@ -31,10 +32,11 @@ const STAGE_HEIGHT = 10633 - 956;
 
 export default function Page() {
   return (
-    <main>
+    <main id="main-content" tabIndex={-1}>
       <FloatingHeader />
       <ScrollReveal />
       <OrderRestore />
+      <StepToast />
       <div id="hero-halls-transition" data-page-hero className="hero-halls-scene">
         <div className="hero-halls-sticky">
           <Hero />

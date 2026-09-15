@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { pickHall, useOrder } from "@/lib/order";
 import { LOCATIONS, hallsOf, shotsOf, plansOf } from "@/lib/halls.mjs";
+import { useSwipe } from "@/lib/useSwipe";
 import HallCard from "./HallCard";
 
 /**
@@ -69,6 +70,9 @@ export default function HallsCatalog() {
       return { ...current, index: (current.index + delta + total) % total };
     });
   }, []);
+
+  /* Свайп по кадру в просмотре — на телефоне основной способ листать. */
+  const swipe = useSwipe(step);
 
   /* Стрелками листаем, пока окно открыто. Escape закрывает сам <dialog>. */
   useEffect(() => {
@@ -142,18 +146,50 @@ export default function HallsCatalog() {
         aria-label={hall ? `Фотографии зала «${hall.title}»` : undefined}
         onClose={() => setView(null)}
         onClick={(e) => {
-          /* Клик мимо кадра — по самому <dialog> — закрывает просмотр. */
-          if (e.target === dialogRef.current) setView(null);
+          /*
+            Нажатие по пустому месту закрывает просмотр. На телефоне окно во
+            весь экран, и в сам <dialog> почти не попасть — поэтому пустым
+            считается всё, кроме кадра, кнопок, ссылок и названия зала.
+            Свайп по кадру клик не присылает (useSwipe гасит его).
+          */
+          const target = e.target as HTMLElement;
+          if (
+            target.closest(
+              "img, button, a, .halls-viewer-half, .halls-viewer-title, .halls-viewer-sub",
+            )
+          ) {
+            return;
+          }
+          setView(null);
         }}
       >
         {hall && view ? (
           <div className="halls-viewer-panel" tabIndex={-1}>
             {/*
               Название крупно и по центру: зал здесь главный, а не подпись
-              к фотографии. Крестика нет — окно закрывается кликом мимо кадра
-              и клавишей Escape, и лишняя кнопка в углу только спорила бы
-              с фотографией.
+              к фотографии. На десктопе крестика нет — окно закрывается кликом
+              мимо кадра и клавишей Escape, и лишняя кнопка в углу только
+              спорила бы с фотографией.
+
+              На телефоне он нужен (виден только ниже 1024, см. halls.css):
+              Escape там нет, а кадр стоит во всю ширину, и «мимо кадра» —
+              узкая полоса, в которую ещё надо догадаться попасть.
             */}
+            <button
+              type="button"
+              className="halls-viewer-close"
+              onClick={() => setView(null)}
+              aria-label="Закрыть просмотр"
+            >
+              <svg viewBox="0 0 12 12" aria-hidden fill="none">
+                <path
+                  d="M2 2l8 8M10 2 2 10"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
             <div className="halls-viewer-head">
               <p className="halls-viewer-title">{hall.title}</p>
               <p className="halls-viewer-sub">
@@ -196,6 +232,7 @@ export default function HallsCatalog() {
             <div
               className="halls-viewer-stage"
               data-mode={view.mode}
+              {...swipe}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -289,9 +326,9 @@ export default function HallsCatalog() {
                 href="/#packages"
                 className="halls-card-book halls-viewer-book"
                 data-picked={order.hall === hall.title}
-                onClick={() => pickHall(hall.title)}
+                onClick={(event) => { if (order.hall === hall.title) { event.preventDefault(); pickHall(""); } else pickHall(hall.title); }}
               >
-                {order.hall === hall.title ? "Выбран" : "Выбрать этот зал"}
+                {order.hall === hall.title ? "Отменить выбор" : "Выбрать этот зал"}
               </Link>
             </div>
           </div>

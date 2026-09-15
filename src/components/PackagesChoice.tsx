@@ -1,5 +1,7 @@
 "use client";
 
+import { scrollToSection } from "@/lib/navigation";
+
 import { useEffect } from "react";
 import { isPackagePicked, pickPackage, useOrder } from "@/lib/order";
 import type { PackageId } from "@/lib/pricing";
@@ -56,7 +58,7 @@ export default function PackagesChoice() {
       */
       if (!снимаем) {
         window.setTimeout(() => {
-          window.location.hash = "price";
+          scrollToSection("price");
         }, 420);
       }
     };

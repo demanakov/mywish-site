@@ -1,3 +1,5 @@
+import "../halls.css";
+import { pageMetadata } from "@/lib/site";
 import type { Metadata } from "next";
 import FloatingHeader from "@/components/FloatingHeader";
 import ScrollReveal from "@/components/ScrollReveal";
@@ -21,13 +23,14 @@ import { HALL_TITLES } from "@/lib/halls.mjs";
  */
 
 export const metadata: Metadata = {
+  ...pageMetadata("Залы MyWish", "/halls"),
   title: "Залы MyWish — девять залов на трёх площадках в Санкт-Петербурге",
   description: `Все залы MyWish by Rubin Loft: ${HALL_TITLES.join(", ")}. Фотографии каждого зала, адреса площадок и карточки на Яндекс.Картах.`,
 };
 
 export default function HallsPage() {
   return (
-    <main className="halls-page">
+    <main id="main-content" tabIndex={-1} className="halls-page">
       <FloatingHeader />
       <ScrollReveal />
       <HallsHero />

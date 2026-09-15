@@ -211,7 +211,7 @@ const DARK_BACKDROPS: { name: string; y: number; h: number }[] = [
 
 export default function Decor() {
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-0">
+    <div aria-hidden className="decor-layer pointer-events-none absolute inset-0">
       {DARK_BACKDROPS.map((zone) => (
         <div
           key={zone.name}

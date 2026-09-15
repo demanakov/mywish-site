@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useOrder } from "@/lib/order";
 import { box } from "@/lib/px";
-import type { PackageId } from "@/lib/pricing";
+import { getPackage, money, type PackageId } from "@/lib/pricing";
 
 /**
  * Подпись под заголовком блока пакетов — подсказка, а не украшение.
@@ -18,14 +18,7 @@ import type { PackageId } from "@/lib/pricing";
  * один признак — что под курсором, — и держать его удобнее в одном месте.
  */
 
-const REST = "Аренда зала + пакет = вся стоимость. Никаких скрытых доплат.";
-
-/** Названия и цены дублируются из разметки: серверные карточки их не отдают. */
-const TITLES: Record<PackageId, { title: string; price: string }> = {
-  happy: { title: "«Хэппи»", price: "19 700 ₽" },
-  extra: { title: "«Экстра»", price: "32 500 ₽" },
-  wow: { title: "«Вау»", price: "100 500 ₽" },
-};
+const REST = "Аренда зала + пакет = стоимость праздника. Дополнения согласуем с тобой.";
 
 export default function PackagesLede() {
   const order = useOrder();
@@ -59,11 +52,11 @@ export default function PackagesLede() {
   const picked = order.pkgTouched ? order.pkg : null;
   let text = REST;
   if (hover) {
-    const { title, price } = TITLES[hover];
+    const { title, price } = getPackage(hover);
     text =
       title +
       " · " +
-      price +
+      money(price) +
       " + аренда зала — " +
       (hover === picked ? "нажми ещё раз, чтобы отменить" : "нажми, чтобы выбрать");
   }

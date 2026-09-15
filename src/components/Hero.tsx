@@ -1,4 +1,6 @@
 "use client";
+import { useBackgroundVideo } from "@/lib/useBackgroundVideo";
+import { enableHeroRunway } from "@/lib/heroRunway";
 
 import { useEffect, useRef, useState } from "react";
 import { box, px } from "@/lib/px";
@@ -63,6 +65,17 @@ const HEADER_AT = 360;
   требуется; внутренние доли сценария оставлены прежними.
 */
 const REVEAL_AT = 4080;
+
+/*
+  Телефон (ниже 1024). Роликов нет — на их месте фото, и ждать загрузки
+  нечего. Сценарий тот же, но без занавеса и почти сразу: шапка через 80мс,
+  левый блок с печатью через 250мс.
+*/
+const MOBILE_QUERY = "(max-width: 1023.98px)";
+/** Телефон (до 767) — на фоне зацикленный ролик; планшет остаётся с фото. */
+const PHONE_QUERY = "(max-width: 767.98px)";
+const MOBILE_HEADER_AT = 80;
+const MOBILE_REVEAL_AT = 250;
 
 /**
  * Медленный наезд кадра. Выключен: исходник в 24 кадра/с, и непрерывное
@@ -143,6 +156,9 @@ export default function Hero() {
   const introRef = useRef<HTMLVideoElement>(null);
   const loopRef = useRef<HTMLVideoElement>(null);
   const [loopVisible, setLoopVisible] = useState(false);
+  /** Ролик телефона и признак, что он реально пошёл (до этого виден постер). */
+  const phoneVideoRef = useRef<HTMLVideoElement>(null);
+  const [phoneVideoOn, setPhoneVideoOn] = useState(false);
   /**
    * Сценарий первого экрана:
    *   0 — чёрный экран, видео грузится
@@ -151,6 +167,10 @@ export default function Hero() {
    *   3 — на 4.08с появляются левый блок, розовая вуаль и растворение внизу
    */
   const [phase, setPhase] = useState(0);
+  /* Кнопки паузы на первом экране нет по просьбе заказчика: фон играет всегда. */
+  useBackgroundVideo(introRef, !loopVisible);
+  useBackgroundVideo(loopRef, loopVisible);
+  useBackgroundVideo(phoneVideoRef, true);
   /** Ref, а не state — читаем из обработчиков событий, которые ставятся один раз. */
   const onLoopRef = useRef(false);
 
@@ -160,7 +180,7 @@ export default function Hero() {
     const v = loopRef.current;
     if (!v) return setLoopVisible(true);
     const show = () => setLoopVisible(true);
-    v.play().then(show, show);
+    if (document.hidden) show(); else v.play().then(show, show);
   };
 
   /**
@@ -169,6 +189,28 @@ export default function Hero() {
    * не случился, стартуем через 0.6с, чтобы страница не осталась чёрной.
    */
   useEffect(() => {
+    if (window.matchMedia(MOBILE_QUERY).matches) {
+      const timers = [
+        window.setTimeout(() => setPhase(1), 0),
+        window.setTimeout(() => setPhase(2), MOBILE_HEADER_AT),
+        window.setTimeout(() => setPhase(3), MOBILE_REVEAL_AT),
+      ];
+
+      /*
+        Ролик телефона. Сценарий его не ждёт: под ним постер — тот же первый
+        кадр, — поэтому текст выходит сразу, а видео проявляется, когда пошло.
+        Браузеры ставят фоновое видео на паузу (свернули вкладку, режим
+        энергосбережения) — возвращаем на первом удобном событии.
+      */
+
+      /* iPhone: верх кадра — под часами, см. lib/heroRunway.ts. */
+      const disableRunway = enableHeroRunway();
+      return () => {
+        timers.forEach((t) => window.clearTimeout(t));
+        disableRunway();
+      };
+    }
+
     const intro = introRef.current;
     let started = false;
     const timers: number[] = [];
@@ -187,73 +229,15 @@ export default function Hero() {
     };
   }, []);
 
-  /**
-   * Браузеры ставят фоновое видео на паузу: в скрытой вкладке, при потере фокуса,
-   * иногда сразу после автозапуска. Поэтому мы не полагаемся на один autoPlay,
-   * а возвращаем воспроизведение, как только страница снова видима или
-   * пользователь что-то сделал. Плюс muted выставляется свойством — без него
-   * часть браузеров отказывает в автозапуске.
-   */
   useEffect(() => {
     const intro = introRef.current;
     const loop = loopRef.current;
     if (!intro || !loop) return;
-
-    intro.muted = true;
-    loop.muted = true;
-
-    const current = () => (onLoopRef.current ? loop : intro);
-    /** Два параллельных play() рвут друг друга (AbortError), поэтому по одному. */
-    let pending = false;
-    const resume = () => {
-      // Намеренно не смотрим на document.hidden: встроенные браузеры и панели
-      // предпросмотра держат страницу «скрытой» постоянно, и проверка навсегда
-      // оставила бы фон замершим. Видео без звука, поэтому попытка безопасна.
-      if (pending) return;
-      const v = current();
-      if (!v.paused || v.ended) return;
-      pending = true;
-      v.play()
-        .catch(() => {})
-        .finally(() => {
-          pending = false;
-        });
+    const warm = () => {
+      if (intro.duration - intro.currentTime < 3 && loop.preload === "none") { loop.preload = "auto"; loop.load(); }
     };
-
-    resume();
-
-    const onVisibility = () => resume();
-    const onIntroPause = () => {
-      if (!intro.ended) window.setTimeout(resume, 60);
-    };
-
-    document.addEventListener("visibilitychange", onVisibility);
-    window.addEventListener("focus", resume);
-    window.addEventListener("pointerdown", resume);
-    window.addEventListener("pointermove", resume, { passive: true });
-    window.addEventListener("keydown", resume);
-    window.addEventListener("scroll", resume, { passive: true });
-    intro.addEventListener("pause", onIntroPause);
-    loop.addEventListener("pause", resume);
-
-    /*
-      Сторож: событий бывает недостаточно — встроенные браузеры и панели
-      предпросмотра ставят медиа на паузу без внятного повода и не всегда
-      присылают visibilitychange. Раз в секунду проверяем и возвращаем.
-    */
-    const watchdog = window.setInterval(resume, 1000);
-
-    return () => {
-      window.clearInterval(watchdog);
-      document.removeEventListener("visibilitychange", onVisibility);
-      window.removeEventListener("focus", resume);
-      window.removeEventListener("pointerdown", resume);
-      window.removeEventListener("pointermove", resume);
-      window.removeEventListener("keydown", resume);
-      window.removeEventListener("scroll", resume);
-      intro.removeEventListener("pause", onIntroPause);
-      loop.removeEventListener("pause", resume);
-    };
+    intro.addEventListener("timeupdate", warm);
+    return () => intro.removeEventListener("timeupdate", warm);
   }, []);
 
   return (
@@ -271,20 +255,27 @@ export default function Hero() {
           data-zoom={ZOOM}
           data-shown={phase >= 1}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/video/hero-poster.webp"
-            alt=""
-            className="absolute inset-0 size-full object-cover"
-            style={{ visibility: phase >= 1 ? "hidden" : "visible" }}
-          />
+          {/* Постер ролика нужен только десктопу: телефону — пустой пиксель. */}
+          <picture>
+            <source
+              media="(max-width: 1023.98px)"
+              srcSet="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+            />
+            { }
+            <img
+              src="/video/hero-poster.webp"
+              alt=""
+              className="absolute inset-0 size-full object-cover"
+              style={{ visibility: phase >= 1 ? "hidden" : "visible" }}
+            />
+          </picture>
           <video
             ref={loopRef}
             className="hero-video absolute inset-0 size-full object-cover"
             loop
             muted
             playsInline
-            preload="auto"
+            preload="none"
             onPlaying={() => setLoopVisible(true)}
           >
             <source src="/video/hero-loop.mp4" type="video/mp4" />
@@ -294,10 +285,9 @@ export default function Hero() {
             ref={introRef}
             className="hero-video absolute inset-0 size-full object-cover"
             style={{ opacity: loopVisible ? 0 : 1 }}
-            autoPlay
             muted
             playsInline
-            preload="auto"
+            preload="none"
             onEnded={handoff}
           >
             <source src="/video/hero-intro.mp4" type="video/mp4" />
@@ -312,6 +302,61 @@ export default function Hero() {
           розовые, и появляться им врозь незачем. См. .hero-seam.
         */}
         <div className="hero-seam" aria-hidden data-shown={phase >= 3} />
+
+        {/*
+          Фон ниже 1024 (см. mobile.css):
+            до 767      — первый кадр ролика как постер, поверх — сам ролик;
+            768…1023    — вертикальное фото (hero-mobile);
+            от 1024     — пустой пиксель: скрытая картинка всё равно
+                          скачалась бы, а так браузер берёт заглушку.
+        */}
+        <picture className="hero-mobile-photo">
+          <source
+            media="(min-width: 1024px)"
+            srcSet="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+          />
+          <source
+            media="(max-width: 767.98px)"
+            srcSet="/figma/1-hero/hero-mobile-video-poster.webp?v=720"
+          />
+          { }
+          <img
+            src="/figma/1-hero/hero-mobile.webp"
+            alt=""
+            fetchPriority="high"
+            className="absolute inset-0 size-full object-cover"
+          />
+        </picture>
+
+        {/*
+          Зацикленный ролик телефона. preload="none": грузит и запускает его
+          скрипт, и только до 767 — планшет и десктоп его не качают. Последний
+          кадр исходника совпадал с первым и при повторе давал заминку, поэтому
+          в веб-версии он срезан (см. README). ?v= — версия ролика: файл
+          заменён под тем же именем, и без метки браузер показал бы старый из кэша.
+        */}
+        <video
+          ref={phoneVideoRef}
+          className="hero-mobile-video"
+          data-playing={phoneVideoOn}
+          muted
+          loop
+          playsInline
+          preload="none"
+          aria-hidden
+          onPlaying={() => setPhoneVideoOn(true)}
+        >
+          <source src="/video/hero-mobile-loop.mp4?v=720" type="video/mp4" />
+          <source src="/video/hero-mobile-loop.webm?v=720" type="video/webm" />
+        </video>
+
+        {/*
+          Градиент под текст телефона (до 767): верх кадра чистый — лицо,
+          корона и бокал без пелены, — к низу плотнеет в светло-розовый.
+          Отдельным слоем, а не вуалью выше: вуаль выезжает анимацией, а этот
+          слой — часть композиции кадра и стоит с самого начала.
+        */}
+        <div className="hero-mobile-shade" aria-hidden />
 
         {/* 914:1025 — розовая вуаль, выезжает слева направо на 7-й секунде */}
         <div
@@ -363,7 +408,7 @@ export default function Hero() {
               >
                 <a
                   href="#contact"
-                  className="u-cta h-41 w-193 text-btn transition-all duration-200 hover:-translate-y-2 hover:bg-navy hover:text-surface"
+                  className="u-cta h-41 w-193 text-btn transition-[transform,background-color,color,box-shadow] duration-200 hover:-translate-y-2 hover:bg-navy hover:text-surface"
                   style={CTA_HERO}
                 >
                   СВЯЗАТЬСЯ
@@ -378,7 +423,7 @@ export default function Hero() {
                 <a
                   href="#halls"
                   data-hero-halls-trigger
-                  className="u-cta h-41 w-136 bg-[rgba(255,241,242,0.63)] text-btn font-normal text-ink-secondary transition-all duration-200 hover:-translate-y-2 hover:bg-blush hover:text-primary"
+                  className="u-cta h-41 w-136 bg-[rgba(255,241,242,0.63)] text-btn font-normal text-ink-secondary transition-[transform,background-color,color,box-shadow] duration-200 hover:-translate-y-2 hover:bg-blush hover:text-primary"
                   style={CTA_HERO}
                 >
                   Выбрать зал

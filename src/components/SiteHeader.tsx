@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import HeaderHome from "./HeaderHome";
+import MobileHeader from "./MobileHeader";
 import { box } from "@/lib/px";
 import { CONTACTS } from "@/lib/contacts";
 
@@ -24,6 +25,7 @@ const NAV = [
   { href: "/#halls", label: "Залы" },
   { href: "/#packages", label: "Пакеты" },
   { href: "/#price", label: "Цены" },
+  { href: "/#contact", label: "Заявка" },
 ];
 
 /** Обводка, тень и размытие кнопки: блок вставлен в макет в масштабе 2.545. */
@@ -34,7 +36,7 @@ const CTA: React.CSSProperties = {
 };
 
 const CHIP =
-  "site-header-chip group flex size-full items-center justify-center rounded-pill border-[0.0675rem] border-[rgba(255,241,242,0.14)] bg-[rgba(255,249,247,0.07)] transition-all duration-200 hover:-translate-y-2 hover:border-primary hover:bg-surface hover:shadow-[0_0.375rem_0.875rem_rgba(28,17,23,0.22)]";
+  "site-header-chip group flex size-full items-center justify-center rounded-pill border-[0.0675rem] border-[rgba(255,241,242,0.14)] bg-[rgba(255,249,247,0.07)] transition-[transform,background-color,color,border-color,box-shadow] duration-200 hover:-translate-y-2 hover:border-primary hover:bg-surface hover:shadow-[0_0.375rem_0.875rem_rgba(28,17,23,0.22)]";
 
 type Slot = {
   key: string;
@@ -60,13 +62,13 @@ const SLOTS: Slot[] = [
   },
   {
     key: "nav",
-    at: [567, 52, 307, 39],
+    at: [477, 52, 397, 39],
     delay: 90,
     /* Навигация 914:1136 — у каждого пункта своя пилюля при наведении. */
     node: (
       <nav
         aria-label="Основная навигация"
-        className="relative grid size-full grid-cols-3 rounded-pill"
+        className="relative grid size-full grid-cols-4 rounded-pill"
         style={{ backgroundColor: "rgba(252,225,227,0.72)" }}
       >
         <span
@@ -171,7 +173,11 @@ export default function SiteHeader({
       {SLOTS.map((slot) => (
         <span
           key={slot.key}
-          className={animated ? "hero-drop absolute" : "absolute"}
+          className={
+            animated
+              ? "site-header-slot hero-drop absolute"
+              : "site-header-slot absolute"
+          }
           style={
             {
               ...box(...slot.at),
@@ -182,6 +188,9 @@ export default function SiteHeader({
           {slot.node}
         </span>
       ))}
+
+      {/* Ниже 1024 вместо пунктов выше — звонок, логотип и меню (mobile.css). */}
+      <MobileHeader animated={animated} />
     </div>
   );
 }
