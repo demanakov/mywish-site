@@ -6,7 +6,8 @@ const browser = await ({chromium, firefox, webkit}[engine]).launch();
 const errors = [];
 async function page(options={}) {
   const p=await browser.newPage({viewport:{width:1440,height:900},reducedMotion:process.env.TEST_MOTION ?? 'reduce',...options});
-  p.on('pageerror',e=>errors.push(e.message));
+  // WebKit reports RSC prefetches cancelled by navigation as "access control checks"; not a site error.
+  p.on('pageerror',e=>{if(!(engine==='webkit'&&/\?_rsc=.*access control checks/.test(e.message)))errors.push(e.message);});
   await p.goto(base,{waitUntil:'domcontentloaded'});
   await p.locator('#name').waitFor({state:'attached'});
   if (options.javaScriptEnabled !== false) {

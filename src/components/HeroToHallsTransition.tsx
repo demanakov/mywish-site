@@ -69,7 +69,13 @@ export default function HeroToHallsTransition() {
     let playing = false;
     let teleported = false;
 
-    const safeTop = () => clamp(window.innerHeight * 0.05, 40, 64);
+    /*
+      Где встаёт верх залов после полёта — тот же отступ, что у перехода по
+      ссылке #halls (src/app/anchors.css), чтобы оба пути вели в одну точку.
+    */
+    const safeTop = () =>
+      parseFloat(getComputedStyle(halls).scrollMarginTop) ||
+      clamp(window.innerHeight * 0.05, 40, 64);
 
     const destinationScroll = () =>
       Math.max(

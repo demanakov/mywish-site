@@ -24,7 +24,7 @@ import { HALL_TITLES } from "@/lib/halls.mjs";
 
 export const metadata: Metadata = {
   ...pageMetadata("Залы MyWish", "/halls"),
-  title: "Залы MyWish — девять залов на трёх площадках в Санкт-Петербурге",
+  title: "Залы MyWish - девять залов на трёх площадках в Санкт-Петербурге",
   description: `Все залы MyWish by Rubin Loft: ${HALL_TITLES.join(", ")}. Фотографии каждого зала, адреса площадок и карточки на Яндекс.Картах.`,
 };
 

@@ -330,7 +330,11 @@ export default function FloatingHeader() {
       <div className="floating-header-scrim" aria-hidden />
 
       <div className="stage relative h-full">
-        <span className="absolute" style={box(131, 20, 171, 69)}>
+        {/*
+          Логотип — в рамке той же высоты, что пилюля меню (39 px макета), по
+          центру строки: как капсула логотипа на телефоне.
+        */}
+        <span className="floating-header-brand absolute" style={box(131, 35, 130, 39)}>
           <HeaderHome floating />
         </span>
 

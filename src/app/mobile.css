@@ -736,12 +736,7 @@
   .halls-card {
     scroll-margin-top: calc(8.25rem + env(safe-area-inset-top));
   }
-  #halls,
-  #packages,
-  #price,
-  #contact {
-    scroll-margin-top: calc(4.5rem + env(safe-area-inset-top));
-  }
+  /* Точные значения для каждого раздела — в src/app/anchors.css. */
 
   /*
     Высота — не меньше экрана, но может расти: если текст на низком экране
@@ -943,7 +938,12 @@
     line-height: 1;
     white-space: nowrap;
     /* Тень макета рассчитана на видео — на светлом низу она грязнит. */
-    box-shadow: 0 0.5rem 1.25rem rgb(28 17 23 / 0.14) !important;
+    /*
+      Тень короче нижнего поля первого экрана (20 px): длинная тень упиралась
+      в его край (overflow: hidden) и обрезалась полосой — на стыке со вторым
+      блоком была видна линия.
+    */
+    box-shadow: 0 0.25rem 0.625rem rgb(28 17 23 / 0.12) !important;
     transition:
       transform 160ms cubic-bezier(0.23, 1, 0.32, 1),
       background-color 160ms var(--ease-out),

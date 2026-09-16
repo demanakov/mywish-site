@@ -2,6 +2,7 @@ import SectionHeading from "./SectionHeading";
 import PickPackage from "./PickPackage";
 import FoodMenuModal, { type FoodSetItem } from "./FoodMenuModal";
 import PackagesChoice from "./PackagesChoice";
+import PackagesRuby from "./PackagesRuby";
 import PackagesLede from "./PackagesLede";
 import PackagesCarousel from "./PackagesCarousel";
 import StepDone from "./StepDone";
@@ -268,6 +269,9 @@ export default function Packages() {
       */}
       <PackagesChoice />
 
+      {/* Рост Руби в карточках на десктопе — одинаковый, по месту в «Вау». */}
+      <PackagesRuby />
+
       {/*
         Ниже 1024 — лента по одной карточке, как выбор зала (PackagesCarousel);
         на десктопе обёртка прозрачна, карточки стоят на координатах макета.
@@ -429,6 +433,7 @@ export default function Packages() {
               прижимает кнопку к низу карточки (mobile.css).
             */}
             <div className="u-package-foot contents">
+            <span className="u-package-mascot-stage" aria-hidden>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={`/figma/packages/${c.img.file}.webp`}
@@ -438,6 +443,7 @@ export default function Packages() {
               className="u-package-mascot max-w-none"
               style={box(c.img.x, c.img.y, c.img.w, c.img.h)}
             />
+            </span>
 
             <PickPackage
               id={c.theme}

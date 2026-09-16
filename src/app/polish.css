@@ -76,6 +76,7 @@
   background: #0e1736;
 }
 @media (max-width: 1023px) {
+  #packages .u-package-mascot-stage { display: none; }
   #contact .rf-form { grid-template-areas:
     "summary summary" "name name" "phone phone" "messenger messenger"
     "hall guests" "more more" "wish wish" "consent consent"
@@ -133,11 +134,3 @@
   #price { translate: 0 -6rem; }
 }
 
-@media (min-width: 1024px) and (max-width: 1199px) {
-  #packages .u-package-lede { font-size: 11.5px !important; }
-  #packages .u-package-group { gap: .0625rem; margin-top: .5rem; }
-  #packages .u-package-group > * { font-size: 11.5px !important; }
-  #packages .u-package-own { padding: .375rem .5rem; }
-  #packages .u-package-card[data-package] .u-package-mascot { height: 6rem !important; }
-  #packages .u-package-card[data-package="wow"] .u-package-mascot { height: 4rem !important; }
-}

@@ -6,10 +6,13 @@ import "./globals.css";
 /* Мобильная раскладка — после основного файла, чтобы перекрывать его правила. */
 import "./mobile.css";
 import "./polish.css";
+/* Куда встают разделы при переходе по ссылке — последним, поверх остальных правил. */
+import "./anchors.css";
 
 export const metadata: Metadata = {
-  ...pageMetadata("MyWish — женские праздники в Санкт-Петербурге", "/"),
-  title: "MyWish — женские праздники в Санкт-Петербурге",
+  ...pageMetadata("MyWish - женские праздники в Санкт-Петербурге", "/"),
+  /* Во вкладке — коротко; для превью в соцсетях остаётся полное (pageMetadata выше). */
+  title: "MyWish - женские праздники",
   description:
     "Твой вишлист уже собран в праздник. Залы, пакеты, личный менеджер и Reels после праздника — MyWish by Rubin Loft, Санкт-Петербург.",
 };
@@ -59,13 +62,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <a className="skip-link" href="#main-content">Перейти к содержимому</a>
         {children}
         {/*
-          Высота окна браузера в пикселях — переменная --app-vh для модальных
-          окон. На iPhone (iOS 26.3) единицы dvh внутри модального <dialog>
-          считались нулём: окно меню с едой открывалось высотой 0 — было видно
-          только затемнение. innerHeight надёжен; обновляется при повороте и
-          смене размера. beforeInteractive — до гидратации, окна ещё не открыты.
-        */}
-        {/*
           Перезагрузка — всегда с начала страницы.
 
           Раньше браузер при перезагрузке возвращал прежнюю позицию или уходил
@@ -88,6 +84,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Script id="reload-to-top" strategy="beforeInteractive">
           {'(function(){try{var n=performance.getEntriesByType("navigation")[0];if(!n||n.type!=="reload")return;history.scrollRestoration="manual";if(location.hash)history.replaceState(history.state,"",location.pathname+location.search);window.scrollTo(0,0);window.addEventListener("load",function(){if(window.scrollY>120)window.scrollTo(0,0)},{once:true})}catch(e){}})()'}
         </Script>
+        {/*
+          Высота окна браузера в пикселях — переменная --app-vh для модальных
+          окон. На iPhone (iOS 26.3) единицы dvh внутри модального <dialog>
+          считались нулём: окно меню с едой открывалось высотой 0 — было видно
+          только затемнение. innerHeight надёжен; обновляется при повороте и
+          смене размера. beforeInteractive — до гидратации, окна ещё не открыты.
+        */}
         <Script id="app-vh" strategy="beforeInteractive">
           {'(function(){var r=document.documentElement;function s(){r.style.setProperty("--app-vh",window.innerHeight+"px")}s();window.addEventListener("resize",s)})()'}
         </Script>

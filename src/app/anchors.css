@@ -1,0 +1,45 @@
+/* ─────────────────────────────────────────────────────────────
+   Куда встаёт раздел при переходе по ссылке (меню, кнопки, #якорь в адресе)
+
+   Одно место на весь сайт. Значение — расстояние от верха окна до верха
+   раздела после перехода (scroll-margin-top). Больше — раздел встаёт ниже,
+   меньше — выше.
+
+     ПК       — в rem: страница масштабируется от ширины окна, и отступ
+                масштабируется вместе с ней (1rem = 16 px макета при 1440).
+     телефон  — в rem (1rem = 16 px) плюс строка состояния iPhone.
+
+   Подобрать значения глазами: открыть сайт с ?anchors в адресе — внизу
+   появится панель (AnchorTuner.tsx): перейти к разделу, докрутить до нужного
+   места, «Запомнить». В режиме разработки значение сразу записывается сюда
+   (app/api/dev/anchors/route.ts) — строки ниже меняются сами.
+
+   Полёт «камерой» к залам на ПК (HeroToHallsTransition.tsx) встаёт по тому
+   же значению, что и #halls здесь.
+   ───────────────────────────────────────────────────────────── */
+
+@media (min-width: 1024px) {
+  #halls { scroll-margin-top: 0.879rem; }
+  #gallery { scroll-margin-top: 0.967rem; }
+  #reels { scroll-margin-top: 1.23rem; }
+  #manager { scroll-margin-top: 1.23rem; }
+  #packages { scroll-margin-top: -0.352rem; }
+  #price { scroll-margin-top: 0.088rem; }
+  #contact { scroll-margin-top: -0.176rem; }
+  #how { scroll-margin-top: 1.23rem; }
+  #where { scroll-margin-top: 1.23rem; }
+  #faq { scroll-margin-top: 1.23rem; }
+}
+
+@media (max-width: 1023.98px) {
+  #halls { scroll-margin-top: calc(-0.563rem + env(safe-area-inset-top)); }
+  #gallery { scroll-margin-top: calc(-0.5rem + env(safe-area-inset-top)); }
+  #reels { scroll-margin-top: calc(0rem + env(safe-area-inset-top)); }
+  #manager { scroll-margin-top: calc(-3.438rem + env(safe-area-inset-top)); }
+  #packages { scroll-margin-top: calc(-2.188rem + env(safe-area-inset-top)); }
+  #price { scroll-margin-top: calc(-0.375rem + env(safe-area-inset-top)); }
+  #contact { scroll-margin-top: calc(-0.5rem + env(safe-area-inset-top)); }
+  #how { scroll-margin-top: calc(-0.5rem + env(safe-area-inset-top)); }
+  #where { scroll-margin-top: calc(-0.5rem + env(safe-area-inset-top)); }
+  #faq { scroll-margin-top: calc(-0.688rem + env(safe-area-inset-top)); }
+}
