@@ -56,12 +56,17 @@
 }
 .rf-reset:hover { color: var(--color-accent); }
 .rf-reset:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; border-radius: 2px; }
-.site-header-telegram {
-  background: #fff0f2 !important;
-  border-color: #182243 !important;
-  box-shadow: 0 2px 9px rgba(24, 34, 67, .19);
+.site-header-telegram,
+.site-header-social {
+  background: rgba(255, 249, 247, .28) !important;
+  border-color: rgba(255, 255, 255, .56) !important;
+  box-shadow: 0 2px 7px rgba(24, 34, 67, .10);
 }
-.site-header-telegram:hover { background: white !important; box-shadow: 0 5px 15px rgba(24, 34, 67, .24); }
+.site-header-telegram:hover,
+.site-header-social:hover {
+  background: rgba(255, 249, 247, .72) !important;
+  box-shadow: 0 4px 11px rgba(24, 34, 67, .16);
+}
 .u-reel-video:fullscreen,
 .u-reel-video:-webkit-full-screen {
   width: 100vw !important;

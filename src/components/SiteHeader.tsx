@@ -117,7 +117,7 @@ const SLOTS: Slot[] = [
     at: [1058, 51, 41, 41],
     delay: 250,
     node: (
-      <a href={CONTACTS.max} aria-label="MAX MyWish" className={CHIP}>
+      <a href={CONTACTS.max} aria-label="MAX MyWish" className={`${CHIP} site-header-social`}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/figma/1-hero/icon-max.svg"
