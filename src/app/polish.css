@@ -10,7 +10,7 @@
 .step-toast, .step-toast-card { box-sizing: border-box; min-width: 0; max-width: 100%; }
 .step-toast[aria-hidden="true"] { visibility: hidden; }
 .step-toast-next { background: #b92c42; }
-.halls-viewer-close { position: absolute; top: 16px; right: 16px; z-index: 5; display: grid; width: 44px; height: 44px; place-items: center; background: #293149; color: white; border-radius: 50%; }
+.halls-viewer-close { position: absolute; top: 16px; right: 16px; z-index: 5; display: grid !important; width: 44px; height: 44px; place-items: center; background: #293149; color: white; border-radius: 50%; }
 .halls-viewer-close svg { width: 16px; }
 .halls-card-book { color: #b32d42; }
 .halls-footer-head { color: #fff9f7; }
@@ -40,6 +40,22 @@
   #consent-note { font-size: max(11px, .65rem) !important; }
   .rf-consent label, .rf-status { font-size: max(12px, .725rem) !important; }
 }
+
+.rf-reset {
+  position: absolute;
+  top: 12px;
+  right: 33px;
+  z-index: 2;
+  border: 0;
+  background: transparent;
+  color: var(--color-ink-muted);
+  font: 500 max(11px, .675rem)/1.2 var(--font-sans);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.rf-reset:hover { color: var(--color-accent); }
+.rf-reset:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; border-radius: 2px; }
 @media (max-width: 1023px) {
   .dp-mobile { grid-template-columns: minmax(0, 1fr); min-width: 0; }
   .dp-card, .dp-options > *, .dp-tiers, .dp-month-title { min-width: 0; }

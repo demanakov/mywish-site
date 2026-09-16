@@ -12,7 +12,7 @@ import { CONTACTS } from "@/lib/contacts";
 import SectionHeading from "./SectionHeading";
 import StepDone from "./StepDone";
 import { box, px } from "@/lib/px";
-import { markSent, pickHall, useOrder, setOrder } from "@/lib/order";
+import { markSent, pickHall, resetDraft, useOrder, setOrder } from "@/lib/order";
 import { MONTHS_OF, getPackage, money, totalOf } from "@/lib/pricing";
 import { LEGAL, type LegalId } from "@/lib/legal";
 import { HALL_TITLES as HALLS } from "@/lib/halls.mjs";
@@ -345,6 +345,19 @@ export default function RequestForm() {
         <noscript><p className="rf-nojs">Для заполнения формы включи JavaScript или <a href={CONTACTS.phone.href}>позвони нам</a>.</p></noscript>
         {/* Зал 914:1803 — девять залов из секции «Выбери зал» */}
         <div className="rf-hall" style={box(33, 33, 914, 69)}>
+          <button
+            type="button"
+            className="rf-reset"
+            onClick={() => {
+              resetDraft();
+              setConsent(false);
+              consentAtRef.current = null;
+              setExtras(false);
+              setMissing({ name: false, phone: false, messenger: false, consent: false });
+            }}
+          >
+            Очистить выбор и поля
+          </button>
           <label
             htmlFor="hall"
             className="block font-sans font-semibold text-ink"
@@ -559,7 +572,12 @@ export default function RequestForm() {
             className="u-field block w-full resize-none rounded-sm bg-surface-alt font-sans text-ink placeholder:text-ink-muted"
             style={{
               marginTop: px(8),
-              height: px(91),
+              /*
+                72, а не 91: при 91 поле заканчивалось на 426 и заходило на
+                сводку (422) — на десктопе они срастались. На телефоне высоту
+                задаёт mobile.css.
+              */
+              height: px(72),
               padding: `${px(12)} ${px(14)}`,
               fontSize: px(14.1),
             }}
