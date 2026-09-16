@@ -18,7 +18,7 @@ import { getPackage, money, type PackageId } from "@/lib/pricing";
  * один признак — что под курсором, — и держать его удобнее в одном месте.
  */
 
-const REST = "Аренда зала + пакет = стоимость праздника. Дополнения согласуем с тобой.";
+const REST = "Аренда зала + пакет = стоимость праздника. Никаких скрытых доплат.";
 
 export default function PackagesLede() {
   const order = useOrder();

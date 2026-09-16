@@ -99,7 +99,7 @@ export default function Manager() {
           className="font-sans"
           style={{ ...box(101, 51, 190, 18), fontSize: px(13.4), color: "#24723c" }}
         >
-          Пример общения
+          Всегда на связи
         </p>
 
         {/* Лента сообщений 914:1198 … 914:1208 */}

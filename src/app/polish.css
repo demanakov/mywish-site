@@ -43,7 +43,7 @@
 
 .rf-reset {
   position: absolute;
-  top: 12px;
+  bottom: 14px;
   right: 33px;
   z-index: 2;
   border: 0;
@@ -56,7 +56,40 @@
 }
 .rf-reset:hover { color: var(--color-accent); }
 .rf-reset:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 3px; border-radius: 2px; }
+.site-header-telegram {
+  background: #fff0f2 !important;
+  border-color: #182243 !important;
+  box-shadow: 0 2px 9px rgba(24, 34, 67, .19);
+}
+.site-header-telegram:hover { background: white !important; box-shadow: 0 5px 15px rgba(24, 34, 67, .24); }
+.u-reel-video:fullscreen,
+.u-reel-video:-webkit-full-screen {
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: none !important;
+  object-fit: contain !important;
+  background: #0e1736;
+}
 @media (max-width: 1023px) {
+  #contact .rf-form { grid-template-areas:
+    "summary summary" "name name" "phone phone" "messenger messenger"
+    "hall guests" "more more" "wish wish" "consent consent"
+    "submit submit" "status status" "reset reset" !important;
+  }
+  #contact .rf-form[data-extras="false"] { grid-template-areas:
+    "summary summary" "name name" "phone phone" "messenger messenger"
+    "hall guests" "more more" "consent consent"
+    "submit submit" "status status" "reset reset" !important;
+  }
+  #contact .rf-reset {
+    position: relative;
+    inset: auto;
+    grid-area: reset;
+    justify-self: center;
+    min-height: 36px;
+    padding: 6px 12px;
+    font-size: 13px;
+  }
   .dp-mobile { grid-template-columns: minmax(0, 1fr); min-width: 0; }
   .dp-card, .dp-options > *, .dp-tiers, .dp-month-title { min-width: 0; }
   .dp-month-title { font-size: clamp(20px, 6vw, 24px); }

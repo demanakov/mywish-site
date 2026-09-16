@@ -345,19 +345,6 @@ export default function RequestForm() {
         <noscript><p className="rf-nojs">Для заполнения формы включи JavaScript или <a href={CONTACTS.phone.href}>позвони нам</a>.</p></noscript>
         {/* Зал 914:1803 — девять залов из секции «Выбери зал» */}
         <div className="rf-hall" style={box(33, 33, 914, 69)}>
-          <button
-            type="button"
-            className="rf-reset"
-            onClick={() => {
-              resetDraft();
-              setConsent(false);
-              consentAtRef.current = null;
-              setExtras(false);
-              setMissing({ name: false, phone: false, messenger: false, consent: false });
-            }}
-          >
-            Очистить выбор и поля
-          </button>
           <label
             htmlFor="hall"
             className="block font-sans font-semibold text-ink"
@@ -774,6 +761,20 @@ export default function RequestForm() {
               ? "Поставь отметку согласия — без неё мы не вправе принять заявку"
               : /* Без ошибки строки нет: «свяжется менеджер» уже сказано над формой. */ ""}
         </p>
+
+        <button
+          type="button"
+          className="rf-reset"
+          onClick={() => {
+            resetDraft();
+            setConsent(false);
+            consentAtRef.current = null;
+            setExtras(false);
+            setMissing({ name: false, phone: false, messenger: false, consent: false });
+          }}
+        >
+          Очистить выбор и поля
+        </button>
 
         </div>
         <div

@@ -101,7 +101,7 @@ const SLOTS: Slot[] = [
     delay: 180,
     /* Соцсети 914:1116 / 914:1119. */
     node: (
-      <a href={CONTACTS.telegram} aria-label="Telegram MyWish" className={CHIP}>
+      <a href={CONTACTS.telegram} aria-label="Telegram MyWish" className={`${CHIP} site-header-telegram`}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/figma/1-hero/icon-telegram.svg"
