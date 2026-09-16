@@ -1,6 +1,7 @@
 import { pageMetadata } from "@/lib/site";
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
+import ProductionIntegration from "@/components/ProductionIntegration";
 import { fira, manrope, pinyon } from "@/lib/fonts";
 import "./globals.css";
 /* Мобильная раскладка — после основного файла, чтобы перекрывать его правила. */
@@ -10,11 +11,11 @@ import "./polish.css";
 import "./anchors.css";
 
 export const metadata: Metadata = {
-  ...pageMetadata("MyWish - женские праздники в Санкт-Петербурге", "/"),
+  ...pageMetadata("Лофт для дня рождения в Санкт-Петербурге – MyWish", "/"),
   /* Во вкладке — коротко; для превью в соцсетях остаётся полное (pageMetadata выше). */
-  title: "MyWish - женские праздники",
+  title: "Лофт для дня рождения в Санкт-Петербурге – MyWish",
   description:
-    "Твой вишлист уже собран в праздник. Залы, пакеты, личный менеджер и Reels после праздника — MyWish by Rubin Loft, Санкт-Петербург.",
+    "Пространства для дня рождения в Санкт-Петербурге: реальные фото, вместимость, меню и варианты программы. Выберите лофт и проверьте свободную дату с MyWish.",
 };
 
 export const viewport: Viewport = {
@@ -105,6 +106,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             {'if(/iPhone|iPad|iPod/.test(navigator.userAgent))document.documentElement.removeAttribute("data-dev-frame")'}
           </Script>
         ) : null}
+        <ProductionIntegration />
       </body>
     </html>
   );

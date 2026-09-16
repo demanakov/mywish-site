@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  images: { formats: ["image/webp"] },
+  output: "export",
+  trailingSlash: true,
+  images: { formats: ["image/webp"], unoptimized: true },
   /*
     Значок разработки Next (чёрная кнопка «N») на телефоне ложился на кнопки
     первого экрана, а свободного угла там нет: сверху звонок и меню, снизу

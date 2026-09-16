@@ -2,12 +2,14 @@ import assert from 'node:assert/strict';
 import { chromium, firefox, webkit } from 'playwright';
 const base = process.env.TEST_URL ?? 'http://localhost:3000';
 const engine = process.env.TEST_BROWSER ?? "chromium";
-const browser = await ({chromium, firefox, webkit}[engine]).launch();
+const browser = await ({chromium, firefox, webkit}[engine]).launch(engine === "chromium" ? {channel: "chrome"} : {});
 const errors = [];
 async function page(options={}) {
   const p=await browser.newPage({viewport:{width:1440,height:900},reducedMotion:process.env.TEST_MOTION ?? 'reduce',...options});
   // WebKit reports RSC prefetches cancelled by navigation as "access control checks"; not a site error.
   p.on('pageerror',e=>{if(!(engine==='webkit'&&/\?_rsc=.*access control checks/.test(e.message)))errors.push(e.message);});
+  await p.route('**/api/leads.php', r => r.fulfill({status: 201, contentType: 'application/json', body: '{"accepted":true,"leadNumber":42}'}));
+  await p.route(/^https:\/\/mc\.yandex\./, r => r.fulfill({status:200, body:''}));
   await p.goto(base,{waitUntil:'domcontentloaded'});
   await p.locator('#name').waitFor({state:'attached'});
   if (options.javaScriptEnabled !== false) {
@@ -76,7 +78,7 @@ try {
   assert.match(await p.locator('#phone-help').innerText(),/Номер/);
   await p.locator('#phone').fill('+34 612 345 678');
   await p.locator('#consent').check();
-  await p.locator('.rf-submit').click(); // Local UI demonstration only; CRM integration intentionally absent.
+  await p.locator('.rf-submit').click(); // Mocked API: no test leads are sent to external services.
   await p.waitForTimeout(400);
   assert.equal(await p.locator('.rf-fields').getAttribute('inert'),'');
   await p.locator('#name').evaluate(e=>e.focus());

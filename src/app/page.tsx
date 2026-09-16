@@ -16,7 +16,6 @@ import FloatingHeader from "@/components/FloatingHeader";
 import ScrollReveal from "@/components/ScrollReveal";
 import OrderRestore from "@/components/OrderRestore";
 import StepToast from "@/components/StepToast";
-import AnchorTuner from "@/components/AnchorTuner";
 import { px } from "@/lib/px";
 
 /**
@@ -38,8 +37,6 @@ export default function Page() {
       <ScrollReveal />
       <OrderRestore />
       <StepToast />
-      {/* Только с ?anchors в адресе: подбор, где встают разделы при переходе. */}
-      <AnchorTuner />
       <div id="hero-halls-transition" data-page-hero className="hero-halls-scene">
         <div className="hero-halls-sticky">
           <Hero />

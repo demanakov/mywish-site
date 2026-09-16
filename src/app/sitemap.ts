@@ -1,3 +1,4 @@
 import type { MetadataRoute } from "next";
 import { siteUrl } from "@/lib/site";
-export default function sitemap(): MetadataRoute.Sitemap { return siteUrl ? ["/", "/halls", "/privacy", "/consent", "/cookies", "/requisites", "/menu"].map(path => ({ url: new URL(path, siteUrl).href })) : []; }
+export const dynamic = "force-static";
+export default function sitemap(): MetadataRoute.Sitemap { return siteUrl ? ["/", "/halls/", "/privacy/", "/consent/", "/cookies/", "/requisites/", "/menu/", "/about/", "/food/", "/reels/", "/glass-cards/", "/blog/", ...["flamingo", "white", "black", "barbi", "sicily", "ocean-drive", "leonardo", "santa-lucia", "rubinhall"].map(hall => `/halls/${hall}/`), ...["gde-otmetit-den-rozhdeniya-v-spb", "kak-organizovat-den-rozhdeniya", "kuda-shodit-na-den-rozhdeniya-v-spb", "idei-dlya-dnya-rozhdeniya-vzroslogo-v-spb", "kak-vybrat-ploshchadku-dlya-dnya-rozhdeniya", "den-rozhdeniya-v-lofte-chto-proverit", "menyu-na-den-rozhdeniya-v-lofte"].map(slug => `/blog/${slug}/`)].map(path => ({ url: new URL(path, siteUrl).href })) : []; }

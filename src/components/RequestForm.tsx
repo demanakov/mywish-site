@@ -17,6 +17,9 @@ import { MONTHS_OF, getPackage, money, totalOf } from "@/lib/pricing";
 import { LEGAL, type LegalId } from "@/lib/legal";
 import { HALL_TITLES as HALLS } from "@/lib/halls.mjs";
 import LegalModal from "./LegalModal";
+import { buildLead, FORM_ID, isAcceptedLead } from "@/lib/lead-payload.mjs";
+import { clientId, goal } from "@/lib/analytics";
+import { resolveAttribution, sourceBucketFromAttribution } from "@/lib/attribution.mjs";
 
 /**
  * Секция 8 «заполни детали своего праздника» — Figma 914:1861 … 914:1802.
@@ -99,6 +102,11 @@ export default function RequestForm() {
 
   /** Заявка ушла — форму накрывает подтверждение (.rf-success). */
   const [thanks, setThanks] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const sendingRef = useRef(false);
+  const requestIdRef = useRef("");
+  const websiteRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const thanksRef = useRef<HTMLHeadingElement>(null);
 
@@ -125,8 +133,10 @@ export default function RequestForm() {
     el.classList.add("u-shake");
   }
 
-  function onSubmit(e: React.FormEvent) {
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (sendingRef.current || thanks) return;
+    setSubmitError("");
     const bad = { name: !nameReady, phone: !phoneReady, messenger: normalizedMessenger === null, consent: !consent };
     setMissing(bad);
 
@@ -150,48 +160,59 @@ export default function RequestForm() {
       return;
     }
 
-    markSent();
-
-    /*
-      Подтверждение — на месте формы, и форма должна быть в кадре: если она
-      видна не целиком, подтягиваем её к центру экрана. Фокус — на заголовок
-      подтверждения, чтобы читалка экрана сразу его произнесла.
-    */
-    setThanks(true);
-    requestAnimationFrame(() => {
-      const form = formRef.current;
-      if (!form) return;
-      const r = form.getBoundingClientRect();
-      if (r.top < 64 || r.bottom > window.innerHeight) {
-        form.scrollIntoView({ behavior: "smooth", block: "center" });
+    sendingRef.current = true;
+    setSubmitting(true);
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 60000);
+    try {
+      let storage: Storage | undefined;
+      try { storage = sessionStorage; } catch { /* Optional storage. */ }
+      if (!requestIdRef.current) {
+        let saved: string | null | undefined;
+        try { saved = storage?.getItem("mywish.main.request-id"); } catch { /* optional */ }
+        requestIdRef.current = saved && /^[a-zA-Z0-9_-]{16,80}$/.test(saved)
+          ? saved : crypto.randomUUID();
+        try { storage?.setItem("mywish.main.request-id", requestIdRef.current); } catch { /* Retry uses the in-memory id. */ }
       }
-      thanksRef.current?.focus({ preventScroll: true });
-    });
-
-    /*
-      Точка подключения бэкенда: отправлять надо этот объект. Отметка согласия
-      идёт отдельным полем с версией документа и временем — этого требует сам
-      текст согласия, и по нему потом доказывают, на какую редакцию человек
-      соглашался.
-    */
-    const payload = {
-      hall: order.hall,
-      date: order.dateTouched ? order.date : null,
-      pkg: order.pkgTouched ? order.pkg : null,
-      hours: order.hoursTouched ? order.hours : null,
-      dateTouched: order.dateTouched, pkgTouched: order.pkgTouched, hoursTouched: order.hoursTouched,
-      estimate: { pkg: order.pkg, hours: order.hours, total: order.date ? total : null },
-      name: name.trim(),
-      phone: normalizedPhone,
-      guests,
-      messenger: normalizedMessenger,
-      wish,
-      consent: {
-        version: LEGAL.consent.version,
-        acceptedAt: consentAtRef.current,
-      },
-    };
-    void payload;
+      const attribution = resolveAttribution(window.location.search, storage);
+      const payload = buildLead(order, getPackage(order.pkg), normalizedPhone, attribution, {
+        requestId: requestIdRef.current,
+        consentAt: consentAtRef.current,
+        messenger: normalizedMessenger,
+        website: websiteRef.current?.value || "",
+        total,
+        path: window.location.pathname,
+      });
+      const response = await fetch("/api/leads.php", {
+        method: "POST", credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...payload, ym_client_id: await clientId() }),
+        signal: controller.signal,
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !isAcceptedLead(result)) {
+        throw new Error(response.status === 400 ? "Проверь данные и повтори отправку." : "Не удалось отправить. Повтори попытку или позвони нам.");
+      }
+      markSent();
+      setThanks(true);
+      requestIdRef.current = "";
+      try { storage?.removeItem("mywish.main.request-id"); } catch { /* optional */ }
+      goal("form_success", { form_id: FORM_ID, source_bucket: sourceBucketFromAttribution(attribution) });
+      requestAnimationFrame(() => {
+        const form = formRef.current;
+        if (!form) return;
+        const r = form.getBoundingClientRect();
+        if (r.top < 64 || r.bottom > window.innerHeight) form.scrollIntoView({ behavior: "smooth", block: "center" });
+        thanksRef.current?.focus({ preventScroll: true });
+      });
+    } catch (error) {
+      setSubmitError(error instanceof Error && error.message.startsWith("Проверь")
+        ? error.message : "Не удалось отправить. Повтори попытку или позвони нам.");
+    } finally {
+      clearTimeout(timeout);
+      sendingRef.current = false;
+      setSubmitting(false);
+    }
   }
 
   // цвет обводки живёт в CSS (.u-field): инлайновый стиль перебил бы :focus
@@ -327,7 +348,8 @@ export default function RequestForm() {
         ref={formRef}
         data-node-id="914:1802"
         data-extras={extras}
-        className="rf-form rounded-md bg-surface"
+        className="rf-form rounded-md bg-surface ym-hide-content ym-disable-keys"
+        aria-busy={submitting}
         style={{
           /*
             Высота 646 вместо 670: поле пожеланий стало на 24 ниже, и всё, что
@@ -341,7 +363,8 @@ export default function RequestForm() {
         onSubmit={onSubmit}
         noValidate
       >
-        <div className="rf-fields" inert={thanks} aria-hidden={thanks}>
+        <div className="rf-fields" inert={thanks || submitting} aria-hidden={thanks}>
+        <input ref={websiteRef} name="website" type="text" tabIndex={-1} autoComplete="off" aria-hidden="true" style={{ position: "absolute", left: "-10000px", width: 1, height: 1 }} />
         <noscript><p className="rf-nojs">Для заполнения формы включи JavaScript или <a href={CONTACTS.phone.href}>позвони нам</a>.</p></noscript>
         {/* Зал 914:1803 — девять залов из секции «Выбери зал» */}
         <div className="rf-hall" style={box(33, 33, 914, 69)}>
@@ -358,7 +381,7 @@ export default function RequestForm() {
               name="hall"
               value={order.hall}
               onChange={(e) => pickHall(e.target.value)}
-              className="u-field block w-full appearance-none rounded-sm bg-surface-alt font-sans text-ink"
+              className="ym-disable-keys u-field block w-full appearance-none rounded-sm bg-surface-alt font-sans text-ink"
               style={{ ...field, paddingRight: px(34) }}
             >
               {/*
@@ -390,7 +413,7 @@ export default function RequestForm() {
             id="name"
             name="name"
             autoComplete="name"
-            maxLength={100}
+            maxLength={80}
             aria-describedby={missing.name ? "name-error" : undefined}
             required
             aria-invalid={missing.name}
@@ -400,7 +423,7 @@ export default function RequestForm() {
               if (missing.name && e.target.value.trim()) setMissing((m) => ({ ...m, name: false }));
             }}
             placeholder="Имя"
-            className="u-field block w-full rounded-sm bg-surface-alt font-sans text-ink placeholder:text-ink-muted"
+            className="ym-disable-keys u-field block w-full rounded-sm bg-surface-alt font-sans text-ink placeholder:text-ink-muted"
             style={field}
           />
           {missing.name && <p id="name-error" className="rf-field-error">Введи имя</p>}
@@ -421,7 +444,7 @@ export default function RequestForm() {
               name="guests"
               value={guests}
               onChange={(e) => setGuests(e.target.value)}
-              className="u-field block w-full appearance-none rounded-sm bg-surface-alt font-sans text-ink"
+              className="ym-disable-keys u-field block w-full appearance-none rounded-sm bg-surface-alt font-sans text-ink"
               style={{ ...field, paddingRight: px(34) }}
             >
               <option value="">Примерно</option>
@@ -463,7 +486,7 @@ export default function RequestForm() {
               if (missing.phone && normalizePhone(next)) setMissing((m) => ({ ...m, phone: false }));
             }}
             placeholder="+7 (___) ___-__-__"
-            className="u-field block w-full rounded-sm bg-surface-alt font-sans text-ink placeholder:text-ink-muted"
+            className="ym-disable-keys u-field block w-full rounded-sm bg-surface-alt font-sans text-ink placeholder:text-ink-muted"
             style={field}
           />
           {/*
@@ -524,7 +547,7 @@ export default function RequestForm() {
             aria-invalid={missing.messenger}
             aria-describedby={missing.messenger ? "messenger-help" : undefined}
             placeholder="@username Telegram или Max"
-            className="u-field block w-full rounded-sm bg-surface-alt font-sans text-ink placeholder:text-ink-muted"
+            className="ym-disable-keys u-field block w-full rounded-sm bg-surface-alt font-sans text-ink placeholder:text-ink-muted"
             style={field}
           />
           {/* Как и у телефона — только причина отказа; как заполнять, говорит placeholder. */}
@@ -551,12 +574,12 @@ export default function RequestForm() {
           <textarea
             id="wish"
             name="wish"
-            maxLength={2000}
+            maxLength={1000}
             rows={3}
             value={wish}
             onChange={(e) => setWish(e.target.value)}
             placeholder="Например: хочу тотал блэк вечеринку"
-            className="u-field block w-full resize-none rounded-sm bg-surface-alt font-sans text-ink placeholder:text-ink-muted"
+            className="ym-disable-keys u-field block w-full resize-none rounded-sm bg-surface-alt font-sans text-ink placeholder:text-ink-muted"
             style={{
               marginTop: px(8),
               /*
@@ -718,7 +741,7 @@ export default function RequestForm() {
         {/* Кнопка 914:1857 */}
         <button
           type="submit"
-          disabled={!hydrated || thanks}
+          disabled={!hydrated || thanks || submitting}
           onPointerEnter={(event) => {
             if (event.pointerType !== "touch") setAiming(true);
           }}
@@ -736,7 +759,7 @@ export default function RequestForm() {
           className="rf-submit u-cta font-extrabold hover:-translate-y-2 hover:bg-navy hover:text-surface"
           style={{ ...box(33, 523, 914, 60), fontSize: px(18.3) }}
         >
-          ОТПРАВИТЬ ЗАЯВКУ
+          {submitting ? "ОТПРАВЛЯЕМ…" : "ОТПРАВИТЬ ЗАЯВКУ"}
         </button>
 
         {/*
@@ -753,13 +776,13 @@ export default function RequestForm() {
           role="status"
           style={{ ...box(33, 597, 914, 16), fontSize: px(11.6) }}
         >
-          {missing.name
+          {submitError || (missing.name
             ? "Введи имя"
             : missing.phone ? "Проверь номер телефона"
             : missing.messenger ? "Проверь адрес мессенджера"
             : missing.consent
               ? "Поставь отметку согласия — без неё мы не вправе принять заявку"
-              : /* Без ошибки строки нет: «свяжется менеджер» уже сказано над формой. */ ""}
+              : /* Без ошибки строки нет. */ "")}
         </p>
 
         <button
@@ -767,6 +790,9 @@ export default function RequestForm() {
           className="rf-reset"
           onClick={() => {
             resetDraft();
+            requestIdRef.current = "";
+            try { sessionStorage.removeItem("mywish.main.request-id"); } catch { /* optional */ }
+            setSubmitError("");
             setConsent(false);
             consentAtRef.current = null;
             setExtras(false);
@@ -797,6 +823,8 @@ export default function RequestForm() {
             className="rf-success-edit"
             onClick={() => {
               setThanks(false);
+              setConsent(false);
+              consentAtRef.current = null;
               setOrder({ sent: false });
               nameRef.current?.focus({ preventScroll: true });
             }}
